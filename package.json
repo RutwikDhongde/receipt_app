@@ -1,0 +1,14 @@
+{
+  "name": "receipt-app-poc",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Pronto order & receipt flow POC. All data lives in data/app-data.json.",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "check": "node scripts/build.mjs --check"
+  },
+  "devDependencies": {
+    "esbuild": "0.24.2"
+  }
+}

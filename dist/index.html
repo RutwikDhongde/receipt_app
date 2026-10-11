@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pronto Receipts</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700;9..40,800&display=swap">
+<style>
+/* Layout: a single phone-sized screen stack. Full-bleed on phones, a framed
+   445px "device" centred on a quiet stage on wider screens. The app commits to
+   one light look on purpose (it mirrors the product design), so every colour
+   is set explicitly and nothing depends on the host theme. */
+:root {
+  --green: #07b15f;
+  --red: #e0463a;
+  --ink: #16161a;
+  --muted: #9a9aa2;
+  --pill-bg: #f0f0f3;
+  --pill-ink: #6f6f78;
+  --hair: #ededf0;
+  --accent: #ff7a08;
+  --surface: #ffffff;
+  --stage: #d9d9de;
+  --font-ui: "DM Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-num: "DM Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  color-scheme: light;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; height: 100%; }
+body { background: var(--stage); color: var(--ink); font-family: var(--font-ui); }
+button { font-family: inherit; color: inherit; }
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+#root { height: 100%; display: flex; align-items: center; justify-content: center; }
+
+.phone {
+  width: 445px; height: min(942px, 100%);
+  background: var(--surface); position: relative; overflow: hidden;
+  border-radius: 34px; box-shadow: 0 30px 70px rgba(22,22,26,.22), 0 0 0 1px rgba(22,22,26,.06);
+}
+@media (max-width: 480px), (max-height: 700px) {
+  .phone { width: 100%; height: 100%; border-radius: 0; box-shadow: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .001s !important; transition-duration: .001s !important; }
+}
+
+.boot-error { max-width: 520px; margin: 24px 16px; padding: 20px 22px; background: var(--surface); border-radius: 16px; font-size: 15px; line-height: 1.5; }
+.boot-error h1 { margin: 0 0 8px; font-size: 19px; }
+.boot-error li { color: var(--red); }
+
+/* ---------- placeholder art ---------- */
+.art { display: block; }
+.avatar-initials { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-weight: 800; color: #fff; background: linear-gradient(140deg, #8d8f99, #5f616b); letter-spacing: .5px; }
+.photo { width: 100%; height: 100%; object-fit: cover; display: block; }
+.banner-mark { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 76px; font-weight: 800; letter-spacing: -2px; color: rgba(255,255,255,.2); }
+/* ---------- screen stack + transitions ---------- */
+.screen {
+  position: absolute; inset: 0; background: #fff;
+  display: flex; flex-direction: column;
+  will-change: transform; overflow: hidden;
+}
+@keyframes slideInRight { from { transform: translateX(100%); } to { transform: translateX(0); } }
+@keyframes slideOutRight { from { transform: translateX(0); } to { transform: translateX(100%); } }
+.screen.enter { animation: slideInRight .28s cubic-bezier(.32,.72,.34,1) both; box-shadow: -14px 0 30px rgba(0,0,0,.12); }
+.screen.exit  { animation: slideOutRight .26s cubic-bezier(.4,0,.6,1) both; box-shadow: -14px 0 30px rgba(0,0,0,.12); }
+.phone.no-anim .screen.enter, .phone.no-anim .screen.exit { animation-duration: .001s; box-shadow: none; }
+/* ---------- nav header ---------- */
+.navhead {
+  height: 54px; flex: none;
+  display: grid; grid-template-columns: 44px 1fr 44px; align-items: center;
+  padding: 0 10px; border-bottom: 1px solid var(--hair);
+}
+.nav-back {
+  width: 40px; height: 40px; border-radius: 50%; border: none; background: none;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: background .15s, transform .12s;
+}
+.nav-back:hover { background: #f3f3f5; }
+.nav-back:active { transform: scale(.9); }
+.nav-title { text-align: center; font-size: 18px; font-weight: 700; letter-spacing: -.2px; }
+
+/* ---------- receipt banner ---------- */
+.banner { position: relative; height: 250px; flex: none; background: #6a1f9c; overflow: hidden; }
+.banner::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(180deg, rgba(0,0,0,.28) 0%, rgba(0,0,0,0) 24%, rgba(0,0,0,0) 60%, rgba(0,0,0,.1) 100%);
+  pointer-events: none;
+}
+.top-controls {
+  position: absolute; top: 58px; left: 0; right: 0;
+  display: flex; align-items: center; justify-content: space-between; padding: 0 18px; z-index: 6;
+}
+.circle-btn {
+  width: 40px; height: 40px; border-radius: 50%; background: #fff; border: none; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 2px 10px rgba(0,0,0,.18); transition: transform .12s ease;
+}
+.circle-btn:active { transform: scale(.92); }
+.help-btn {
+  height: 40px; border-radius: 20px; border: none; cursor: pointer; background: #fff;
+  padding: 0 16px 0 12px; display: flex; align-items: center; gap: 8px;
+  font-weight: 700; font-size: 16px; color: var(--ink);
+  box-shadow: 0 2px 10px rgba(0,0,0,.18); transition: transform .12s ease;
+}
+.help-btn:active { transform: scale(.95); }
+
+/* ---------- receipt sheet ---------- */
+.sheet { position: relative; margin-top: -22px; background: #fff; border-radius: 22px 22px 0 0; flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; z-index: 4; }
+.scroll { flex: 1 1 auto; overflow-y: auto; padding: 26px 22px 8px; }
+.scroll::-webkit-scrollbar { width: 0; }
+
+.place-name { display: flex; align-items: center; gap: 6px; font-size: 27px; font-weight: 700; letter-spacing: -.4px; line-height: 1.12; margin: 0; }
+.place-name .chev { flex: none; color: #2a2a30; margin-top: 2px; }
+.status-line { margin-top: 9px; font-size: 14.5px; font-weight: 500; }
+.status-line .done { font-weight: 700; }
+.status-line .date { color: var(--muted); margin-left: 6px; }
+
+.rule { height: 1px; background: var(--hair); margin: 20px 0; border: 0; }
+
+.section-head { display: flex; align-items: center; justify-content: space-between; }
+.section-head .left { display: flex; align-items: center; gap: 12px; }
+.section-head h2 { margin: 0; font-size: 21px; font-weight: 700; letter-spacing: -.2px; }
+.show-more { display: flex; align-items: center; gap: 6px; background: none; border: none; cursor: pointer; font-family: inherit; color: var(--ink); font-size: 16.5px; font-weight: 600; padding: 4px 2px; }
+.show-more .chev { transition: transform .22s ease; }
+.show-more.open .chev { transform: rotate(180deg); }
+
+.items { margin-top: 6px; }
+.item { display: flex; align-items: flex-start; gap: 16px; padding: 14px 0; }
+.qty { flex: none; margin-top: 1px; min-width: 34px; height: 23px; padding: 0 9px; border-radius: 7px; background: var(--pill-bg); color: var(--pill-ink); font-size: 13px; font-weight: 600; display: flex; align-items: center; justify-content: center; }
+.item-name { font-size: 17px; font-weight: 700; line-height: 1.3; letter-spacing: -.1px; }
+.collapsing { overflow: hidden; transition: height .28s ease, opacity .2s ease; }
+
+.total-wrap { padding: 6px 0 2px; display: flex; gap: 16px; align-items: flex-start; }
+.receipt-ico { flex: none; margin-top: 4px; }
+.total-line { font-size: 22px; font-weight: 800; letter-spacing: -.3px; }
+.order-id { margin-top: 5px; display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 14.5px; font-weight: 500; }
+.copy-btn { background: none; border: none; cursor: pointer; color: var(--muted); padding: 2px; display: flex; transition: color .15s, transform .12s; }
+.copy-btn:active { transform: scale(.85); }
+.copy-btn.copied { color: var(--green); }
+.copied-toast { font-size: 12.5px; font-weight: 700; color: var(--green); }
+
+/* ---------- footer / buttons ---------- */
+.footer { flex: none; padding: 14px 20px 26px; background: #fff; box-shadow: 0 -8px 18px rgba(0,0,0,.04); }
+.btn { width: 100%; height: 58px; border-radius: 14px; font-family: inherit; font-size: 19px; font-weight: 700; cursor: pointer; border: none; transition: transform .12s ease, box-shadow .15s ease; display: flex; align-items: center; justify-content: center; gap: 9px; }
+.btn:active { transform: scale(.985); }
+.btn-primary { color: #fff; background: linear-gradient(95deg, color-mix(in oklab, var(--accent) 74%, #fff) 0%, var(--accent) 60%, color-mix(in oklab, var(--accent) 80%, #d83a00) 100%); box-shadow: 0 8px 18px color-mix(in oklab, var(--accent) 36%, transparent); margin-bottom: 12px; }
+.btn-secondary { color: var(--ink); background: #fff; border: 1.6px solid #e4e4e8; }
+.btn-secondary:active { background: #fafafa; }
+
+/* ---------- order list ---------- */
+
+/* ---------- itemized receipt ---------- */
+
+/* ---------- reorder ---------- */
+.ro-head { padding: 22px 24px 6px; }
+.ro-head h2 { margin: 0; font-size: 23px; font-weight: 800; letter-spacing: -.3px; }
+.ro-head p { margin: 5px 0 0; color: var(--muted); font-size: 14.5px; font-weight: 500; }
+.ro-list { padding: 8px 24px 8px; }
+.ro-item { display: flex; align-items: center; gap: 14px; padding: 12px 0; border-bottom: 1px solid var(--hair); }
+.ro-item:last-child { border-bottom: 0; }
+.ro-q { width: 30px; height: 30px; border-radius: 9px; background: var(--pill-bg); color: var(--pill-ink); font-size: 13px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex: none; }
+.ro-n { flex: 1 1 auto; font-size: 15px; font-weight: 600; line-height: 1.3; }
+.ro-p { font-family: "DM Mono", monospace; font-size: 14px; font-weight: 500; flex: none; }
+.ro-success { position: absolute; inset: 0; background: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 40px; z-index: 10; }
+.ro-check { width: 92px; height: 92px; border-radius: 50%; background: color-mix(in oklab, var(--green) 14%, #fff); display: flex; align-items: center; justify-content: center; color: var(--green); margin-bottom: 24px; animation: pop .4s cubic-bezier(.2,1.3,.4,1) both; }
+@keyframes pop { from { transform: scale(.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.ro-success h3 { margin: 0; font-size: 24px; font-weight: 800; letter-spacing: -.3px; }
+.ro-success p { margin: 8px 0 0; color: var(--muted); font-size: 15px; font-weight: 500; max-width: 260px; line-height: 1.45; }
+
+/* ---------- help ---------- */
+.toast { position: absolute; left: 50%; bottom: 104px; transform: translateX(-50%) translateY(10px); background: #16161a; color: #fff; padding: 11px 18px; border-radius: 12px; font-size: 14px; font-weight: 600; opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; z-index: 20; white-space: nowrap; }
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ---------- home / map ---------- */
+.home-map { position: absolute; inset: 0; background: #e7eae6; overflow: hidden; }
+.home-map svg.map { position: absolute; inset: 0; width: 100%; height: 100%; }
+.map-chip { position: absolute; top: 60px; width: 46px; height: 46px; border-radius: 50%; background: #fff; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 3px 12px rgba(0,0,0,.14); transition: transform .12s; z-index: 6; }
+.map-chip:active { transform: scale(.92); }
+.map-chip.left { left: 18px; }
+.map-chip.right { right: 18px; }
+.safety-chip { position: absolute; left: 18px; top: 122px; display: flex; align-items: center; gap: 9px; background: #fff; border: none; cursor: pointer; padding: 11px 16px 11px 12px; border-radius: 14px; box-shadow: 0 3px 12px rgba(0,0,0,.12); font-family: inherit; font-size: 15px; font-weight: 700; color: var(--ink); z-index: 6; }
+.home-pin { position: absolute; left: 52%; top: 44%; z-index: 4; filter: drop-shadow(0 4px 6px rgba(0,0,0,.25)); }
+.home-card { position: absolute; left: 0; right: 0; bottom: 0; background: #fff; border-radius: 26px 26px 0 0; padding: 30px 26px 30px; box-shadow: 0 -10px 30px rgba(0,0,0,.12); z-index: 5; text-align: center; }
+.home-illo { width: 100%; height: 180px; display: block; margin: 0 auto 18px; }
+.home-card h2 { margin: 0 0 22px; font-size: 30px; font-weight: 800; letter-spacing: -.7px; line-height: 1.12; text-align: left; }
+
+/* ---------- side drawer ---------- */
+.drawer-scrim { position: absolute; inset: 0; background: rgba(20,20,26,.4); opacity: 0; pointer-events: none; transition: opacity .28s ease; z-index: 40; }
+.drawer-scrim.show { opacity: 1; pointer-events: auto; }
+.drawer { position: absolute; top: 0; bottom: 0; left: 0; width: 80%; max-width: 340px; background: #fff; border-radius: 0 24px 24px 0; transform: translateX(-100%); transition: transform .3s cubic-bezier(.32,.72,.34,1); z-index: 41; display: flex; flex-direction: column; box-shadow: 14px 0 40px rgba(0,0,0,.18); }
+.drawer.open { transform: translateX(0); }
+.drawer-head { background: linear-gradient(160deg, #eef0f3 0%, #f7f8fa 60%); padding: 64px 22px 22px; display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
+.drawer-head .dh-name { font-size: 21px; font-weight: 800; letter-spacing: -.4px; }
+.drawer-head .dh-edit { margin-top: 6px; display: flex; align-items: center; gap: 3px; color: var(--muted); font-size: 13.5px; font-weight: 600; }
+.drawer-avatar { width: 58px; height: 58px; border-radius: 50%; flex: none; background: #d3d5da; display: flex; align-items: center; justify-content: center; color: #fff; overflow: hidden; }
+.drawer-menu { flex: 1 1 auto; overflow-y: auto; padding: 14px 8px; }
+.drawer-item { display: flex; align-items: center; gap: 18px; width: 100%; background: none; border: none; cursor: pointer; font-family: inherit; padding: 15px 16px; border-radius: 12px; text-align: left; transition: background .15s; }
+.drawer-item:hover { background: #f5f5f7; }
+.drawer-item:active { background: #eeeef1; }
+.drawer-item .di-ico { width: 26px; display: flex; justify-content: center; flex: none; }
+.drawer-item .di-label { font-size: 17px; font-weight: 600; }
+.drawer-sep { height: 1px; background: var(--hair); margin: 8px 22px; }
+
+/* ---------- my trips ---------- */
+.trips-head { padding: 4px 22px 0; }
+.trips-close { width: 38px; height: 38px; margin-left: -8px; border: none; background: none; cursor: pointer; display: flex; align-items: center; }
+.trips-head h1 { margin: 8px 0 14px; font-size: 28px; font-weight: 800; letter-spacing: -.5px; }
+.trips-tabs { display: grid; grid-template-columns: 1fr 1fr; }
+.trips-tab { background: none; border: none; cursor: pointer; font-family: inherit; font-size: 18px; font-weight: 600; color: var(--muted); padding: 8px 0 14px; position: relative; }
+.trips-tab.active { color: var(--accent); font-weight: 700; }
+.trips-tab.active::after { content: ""; position: absolute; left: 50%; bottom: 0; transform: translateX(-50%); width: 64px; height: 3px; border-radius: 2px; background: var(--accent); }
+.trips-body { flex: 1 1 auto; overflow-y: auto; background: #f0f0f3; }
+.trips-body::-webkit-scrollbar { width: 0; }
+.trips-section { color: var(--muted); font-size: 14px; font-weight: 500; padding: 16px 22px 6px; }
+.trip-card { background: #fff; margin: 0 0 10px; padding: 18px 22px; cursor: pointer; transition: background .12s; }
+.trip-card:active { background: #fafafa; }
+.trip-row1 { display: flex; align-items: center; justify-content: space-between; }
+.trip-kind { font-size: 15px; font-weight: 600; }
+.trip-status { display: flex; align-items: center; gap: 5px; color: #6b6b73; font-size: 15px; font-weight: 500; }
+.trip-status.canceled { color: #e0463a; }
+.trip-when { margin-top: 12px; display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 500; }
+.trip-merchant { margin-top: 10px; font-size: 16px; font-weight: 600; }
+.trip-meta { margin-top: 4px; color: var(--muted); font-size: 14px; font-weight: 500; }
+.trips-empty { padding: 80px 30px; text-align: center; color: var(--muted); }
+.trips-empty h3 { margin: 0 0 6px; font-size: 18px; font-weight: 700; color: var(--ink); }
+.trips-empty p { margin: 0; font-size: 14.5px; }
+
+/* ---------- itemized (thank you) ---------- */
+.ty-banner { position: relative; background: #f4e3c1; padding: 0 24px 22px; flex: none; }
+.ty-back { position: absolute; top: 56px; left: 14px; width: 40px; height: 40px; border: none; background: none; cursor: pointer; display: flex; align-items: center; z-index: 3; }
+.ty-banner h1 { margin: 0; padding-top: 96px; font-size: 28px; font-weight: 800; letter-spacing: -.6px; line-height: 1.14; }
+.ty-illo { width: 100%; height: 170px; display: block; margin-top: 6px; }
+.ty-body { flex: 1 1 auto; overflow-y: auto; }
+.ty-body::-webkit-scrollbar { width: 0; }
+.ty-total { display: flex; align-items: flex-start; justify-content: space-between; padding: 22px 24px 20px; }
+.ty-total .lbl { font-size: 21px; font-weight: 800; }
+.ty-total .amt { text-align: right; }
+.ty-total .amt .big { font-size: 30px; font-weight: 800; letter-spacing: -.6px; }
+.ty-total .amt .saved { margin-top: 3px; font-size: 14px; font-weight: 600; color: var(--accent); }
+.ty-group { border-top: 1px solid var(--hair); padding: 4px 24px; }
+.ty-line { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 11px 0; }
+.ty-line .l, .ty-line .r { white-space: nowrap; }
+.ty-line.head .l, .ty-line.head .r { font-size: 17px; font-weight: 800; }
+.ty-line .l { color: var(--muted); font-size: 15px; font-weight: 500; }
+.ty-line .r { font-size: 15px; font-weight: 600; }
+.ty-line .r.disc, .ty-line .l.disc { color: var(--accent); }
+.ty-pay { display: flex; align-items: center; justify-content: space-between; border-top: 1px solid var(--hair); padding: 18px 24px 30px; }
+.ty-pay .who { display: flex; align-items: center; gap: 11px; font-size: 18px; font-weight: 700; }
+.ty-pay .amt { font-size: 18px; font-weight: 700; }
+
+/* ---------- help (redesigned) ---------- */
+.help-hero { position: relative; background: linear-gradient(180deg, #fdeee3 0%, #fbf3ec 100%); padding: 26px 22px 30px; overflow: hidden; }
+.help-hero h2 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -.3px; max-width: 60%; }
+.help-hero .help-illo { position: absolute; right: 6px; bottom: -6px; width: 150px; height: 130px; }
+.help-card { margin: -18px 18px 0; position: relative; z-index: 2; background: #fff; border-radius: 16px; box-shadow: 0 8px 24px rgba(0,0,0,.08); }
+.help-card .help-row { display: flex; align-items: center; gap: 16px; padding: 20px 18px; width: 100%; background: none; border: none; cursor: pointer; font-family: inherit; }
+.help-card .help-row .hr-label { flex: 1 1 auto; text-align: left; font-size: 17px; font-weight: 600; }
+.help-bg { flex: 1 1 auto; background: #f0f0f3; }
+
+/* ---------- generic settings list (profile / payment) ---------- */
+.set-body { flex: 1 1 auto; overflow-y: auto; background: #fff; }
+.set-body::-webkit-scrollbar { width: 0; }
+.set-gap { height: 12px; background: #f0f0f3; }
+.set-pad { padding: 4px 22px; }
+
+.prof-head { display: flex; align-items: center; justify-content: space-between; padding: 22px 22px; }
+.prof-avatar { width: 78px; height: 78px; border-radius: 50%; background: #ececed; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+.prof-edit { display: flex; align-items: center; gap: 4px; font-size: 17px; font-weight: 700; color: var(--ink); }
+.prof-field { padding: 16px 22px; border-top: 1px solid var(--hair); }
+.prof-field .pf-label { font-size: 13.5px; color: var(--muted); font-weight: 500; }
+.prof-field .pf-value { margin-top: 5px; font-size: 18px; font-weight: 700; }
+.set-row { display: flex; align-items: center; gap: 14px; width: 100%; background: none; border: none; cursor: pointer; font-family: inherit; padding: 19px 22px; border-top: 1px solid var(--hair); text-align: left; transition: background .12s; }
+.set-row:active { background: #fafafa; }
+.set-row .sr-label { flex: 1 1 auto; font-size: 17px; font-weight: 600; }
+.set-row .sr-value { color: var(--muted); font-size: 15.5px; font-weight: 500; }
+.set-row .sr-flag { color: #e0463a; font-size: 15.5px; font-weight: 600; }
+.set-row .sr-chev { color: #c4c4cc; flex: none; }
+
+/* ---------- payment methods ---------- */
+.pay-row { display: flex; align-items: center; gap: 16px; width: 100%; background: none; border: none; cursor: pointer; font-family: inherit; padding: 20px 22px; border-bottom: 1px solid var(--hair); text-align: left; transition: background .12s; }
+.pay-row:active { background: #fafafa; }
+.pay-logo { width: 38px; flex: none; display: flex; align-items: center; }
+.pay-name { flex: 1 1 auto; font-size: 18px; font-weight: 700; }
+.pay-name .pn-sub { font-size: 13.5px; font-weight: 500; color: var(--muted); margin-top: 2px; }
+.pay-dots { letter-spacing: 1px; }
+
+/* ---------- top safe area (the real OS status bar sits here) ---------- */
+.statusbar { height: 44px; flex: none; }
+button.trip-card { display: block; width: 100%; border: none; text-align: left; color: var(--ink); }
+
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script id="app-data" type="application/json">{"brand":"Pronto","currency":"₡","profile":{"firstName":"Rutwik","lastName":"Dhongde","mobile":"62****81","email":"d***@gmail.com","emailVerified":false,"avatar":null},"payments":[{"id":"cash","type":"cash","label":"Cash"},{"id":"v7422","type":"visa","last4":"7422"},{"id":"m2341","type":"mastercard","last4":"2341"},{"id":"v8538","type":"visa","last4":"8538"}],"orders":[{"id":"delimart-1","merchant":"Delimart - Guachipelin","status":"Canceled","date":"2025-10-15T02:08","orderId":"5764644957201697285","items":[{"qty":1,"name":"Combo Familiar de Pollo Frito","price":3200},{"qty":1,"name":"Arroz con Camarones","price":1950},{"qty":2,"name":"Refresco Natural de Cas","price":900},{"qty":1,"name":"Tres Leches Casero","price":550}],"deliveryFee":613,"deliveryCoupon":613,"serviceFee":528,"tip":330,"payment":{"type":"mastercard","last4":"2341"}},{"id":"wings-burger","merchant":"Wings Burger Bar","status":"Completed","date":"2025-10-12T22:10","orderId":"5764644957201640012","items":[{"qty":1,"name":"Combo Alitas BBQ 12 unidades","price":4200}],"deliveryFee":561,"deliveryCoupon":0,"serviceFee":200,"tip":0,"payment":{"type":"mastercard","last4":"2341"}},{"id":"maxis","merchant":"Maxi's Restaurante By Ricky","status":"Completed","date":"2025-10-08T21:36","orderId":"5764644957201622876","items":[{"qty":1,"name":"Casado Especial Maxi","price":4800},{"qty":1,"name":"Pizza Personal Pepperoni","price":1700}],"deliveryFee":600,"deliveryCoupon":0,"serviceFee":250,"tip":0,"payment":{"type":"mastercard","last4":"2341"}},{"id":"automercado-big-shop","merchant":"Auto Mercado - Escazú","status":"Completed","date":"2025-10-09T18:45","orderId":"5764644957201611490","items":[{"qty":2,"name":"Leche Dos Pinos 1 L","price":1780},{"qty":1,"name":"Huevos Grandes x12","price":2350},{"qty":1,"name":"Café Britt Tradicional 340 g","price":4100},{"qty":3,"name":"Banano por unidad","price":450},{"qty":1,"name":"Arroz Tío Pelón 1.8 kg","price":2650},{"qty":1,"name":"Frijoles Negros Ducal 400 g","price":1150},{"qty":1,"name":"Aguacate Hass","price":990},{"qty":2,"name":"Yogurt Griego Natural","price":2400},{"qty":1,"name":"Salsa Lizano 280 ml","price":1290},{"qty":1,"name":"Pan Baguette","price":1100}],"deliveryFee":1200,"deliveryCoupon":400,"serviceFee":690,"tip":500,"payment":{"type":"visa","last4":"7422"}},{"id":"delimart-2","merchant":"Delimart - Guachipelin","status":"Completed","date":"2025-10-08T00:12","orderId":"5764644957201699341","items":[{"qty":1,"name":"Pan Artesanal Integral","price":1200},{"qty":1,"name":"Jamón de Pavo 250 g","price":2300},{"qty":1,"name":"Queso Turrialba","price":1500}],"deliveryFee":500,"deliveryCoupon":0,"serviceFee":440,"tip":0,"payment":{"type":"mastercard","last4":"2341"}}],"images":{}}</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+<script>
+(()=>{var f=({size:e=22,w:t=2.6})=>React.createElement("svg",{width:e,height:e,viewBox:"0 0 24 24",fill:"none",stroke:"currentColor",strokeWidth:t,strokeLinecap:"round",strokeLinejoin:"round"},React.createElement("path",{d:"m9 6 6 6-6 6"})),F=({size:e=20})=>React.createElement("svg",{width:e,height:e,viewBox:"0 0 24 24",fill:"none",stroke:"currentColor",strokeWidth:"2.4",strokeLinecap:"round",strokeLinejoin:"round"},React.createElement("path",{d:"m6 9 6 6 6-6"})),w=({col:e="#1c1c22"})=>React.createElement("svg",{width:"22",height:"22",viewBox:"0 0 24 24",fill:"none",stroke:e,strokeWidth:"2.5",strokeLinecap:"round",strokeLinejoin:"round"},React.createElement("path",{d:"m15 6-6 6 6 6"})),B=()=>React.createElement("svg",{width:"22",height:"22",viewBox:"0 0 24 24",fill:"none",stroke:"#16161a",strokeWidth:"1.9",strokeLinecap:"round",strokeLinejoin:"round"},React.createElement("path",{d:"M4.4 13.4v-1.6a7.6 7.6 0 0 1 15.2 0v1.6"}),React.createElement("rect",{x:"2.5",y:"12.2",width:"3.7",height:"6.6",rx:"1.85",fill:"#16161a",stroke:"none"}),React.createElement("rect",{x:"17.8",y:"12.2",width:"3.7",height:"6.6",rx:"1.85",fill:"#16161a",stroke:"none"}),React.createElement("path",{d:"M19.6 18.8v.5a3 3 0 0 1-3 3h-3.1"}),React.createElement("circle",{cx:"12.6",cy:"22.3",r:"1.15",fill:"#16161a",stroke:"none"})),P=({size:e=26})=>React.createElement("svg",{width:e,height:e*24/26,viewBox:"0 0 26 24",fill:"currentColor"},React.createElement("rect",{x:"11.7",y:"3.4",width:"2.6",height:"3.1",rx:"1.3"}),React.createElement("path",{d:"M3.4 16.7C3.4 11.4 7.7 7.1 13 7.1s9.6 4.3 9.6 9.6H3.4z"}),React.createElement("rect",{x:"2.3",y:"16.5",width:"21.4",height:"2.7",rx:"1.35"})),D=()=>React.createElement("svg",{width:"22",height:"26",viewBox:"0 0 24 26",fill:"#16161a"},React.createElement("path",{d:"M4 5.2C4 3.4 5.4 2 7.2 2h9.6C18.6 2 20 3.4 20 5.2V21.9L17.7 20 15.4 22 13.1 20 10.8 22 8.5 20 6.2 22 4 20.1V5.2z"}),React.createElement("rect",{x:"7.5",y:"9.4",width:"9",height:"2.1",rx:"1.05",fill:"#fff"}),React.createElement("rect",{x:"7.5",y:"13",width:"9",height:"2.1",rx:"1.05",fill:"#fff"})),R=()=>React.createElement("svg",{width:"16",height:"16",viewBox:"0 0 24 24",fill:"none",stroke:"currentColor",strokeWidth:"2",strokeLinecap:"round",strokeLinejoin:"round"},React.createElement("rect",{x:"9",y:"9",width:"11",height:"11",rx:"2.4"}),React.createElement("path",{d:"M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"})),I=({size:e=16,w:t=2.6})=>React.createElement("svg",{width:e,height:e,viewBox:"0 0 24 24",fill:"none",stroke:"currentColor",strokeWidth:t,strokeLinecap:"round",strokeLinejoin:"round"},React.createElement("path",{d:"M20 6 9 17l-5-5"})),j=()=>React.createElement("svg",{width:"20",height:"20",viewBox:"0 0 24 24",fill:"none",stroke:"currentColor",strokeWidth:"2.6",strokeLinecap:"round"},React.createElement("path",{d:"M12 5v14M5 12h14"}));var O=()=>React.createElement("svg",{width:"22",height:"22",viewBox:"0 0 24 24",fill:"none",stroke:"#1c1c22",strokeWidth:"2.3",strokeLinecap:"round"},React.createElement("path",{d:"M4 7h16M4 12h16M4 17h11"})),A=({col:e="#1c1c22"})=>React.createElement("svg",{width:"21",height:"21",viewBox:"0 0 24 24",fill:"none",stroke:e,strokeWidth:"2.1",strokeLinecap:"round",strokeLinejoin:"round"},React.createElement("path",{d:"M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"})),T=({col:e="#2a6fdb"})=>React.createElement("svg",{width:"22",height:"22",viewBox:"0 0 24 24",fill:e},React.createElement("path",{d:"M12 2 4 5v6c0 5 3.4 8.5 8 11 4.6-2.5 8-6 8-11V5l-8-3z"}),React.createElement("path",{d:"m8.5 12 2.2 2.2L15.5 9.5",stroke:"#fff",strokeWidth:"1.9",fill:"none",strokeLinecap:"round",strokeLinejoin:"round"})),z=()=>React.createElement("svg",{width:"24",height:"24",viewBox:"0 0 24 24",fill:"none",stroke:"#1c1c22",strokeWidth:"2.3",strokeLinecap:"round"},React.createElement("path",{d:"M6 6l12 12M18 6 6 18"})),V=()=>React.createElement("svg",{width:"16",height:"16",viewBox:"0 0 24 24",fill:"none",stroke:"#9a9aa2",strokeWidth:"2"},React.createElement("circle",{cx:"12",cy:"12",r:"9"}),React.createElement("path",{d:"M12 7v5l3 2",strokeLinecap:"round",strokeLinejoin:"round"})),E=()=>React.createElement("svg",{width:"22",height:"22",viewBox:"0 0 24 24",fill:"#f5793a"},React.createElement("rect",{x:"4",y:"3",width:"15",height:"18",rx:"2.5"}),React.createElement("rect",{x:"4",y:"3",width:"4",height:"18",rx:"2",fill:"#d95f24"})),q=()=>React.createElement("svg",{width:"22",height:"22",viewBox:"0 0 24 24",fill:"#17b890"},React.createElement("rect",{x:"3",y:"6",width:"18",height:"13",rx:"3"}),React.createElement("rect",{x:"14",y:"10.5",width:"6",height:"4.5",rx:"2.2",fill:"#0e8e6e"})),G=()=>React.createElement("svg",{width:"22",height:"22",viewBox:"0 0 24 24",fill:"#17b890"},React.createElement("path",{d:"M4 5h16a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H9l-4 4v-4H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z"})),Y=()=>React.createElement("svg",{width:"22",height:"22",viewBox:"0 0 24 24",fill:"#2a6fdb"},React.createElement("path",{d:"M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zm9 4-1.9-.6a7 7 0 0 0-.5-1.2l1-1.7-1.4-1.4-1.7 1a7 7 0 0 0-1.2-.5L14 4h-2l-.6 1.9a7 7 0 0 0-1.2.5l-1.7-1L7.1 6.8l1 1.7a7 7 0 0 0-.5 1.2L5.7 10v4l1.9.6c.1.4.3.8.5 1.2l-1 1.7 1.4 1.4 1.7-1c.4.2.8.4 1.2.5L12 22h2l.6-1.9c.4-.1.8-.3 1.2-.5l1.7 1 1.4-1.4-1-1.7c.2-.4.4-.8.5-1.2L21 16v-4z"}),React.createElement("circle",{cx:"12",cy:"12",r:"3.4",fill:"#fff"})),U=()=>React.createElement("svg",{width:"22",height:"22",viewBox:"0 0 24 24",fill:"#f5793a"},React.createElement("rect",{x:"3",y:"8",width:"18",height:"4",rx:"1"}),React.createElement("rect",{x:"4.5",y:"12",width:"15",height:"9",rx:"1.5"}),React.createElement("rect",{x:"11",y:"8",width:"2",height:"13",fill:"#d95f24"}),React.createElement("path",{d:"M12 8c-2-3-6-2-5 0M12 8c2-3 6-2 5 0",stroke:"#f5793a",strokeWidth:"1.8",fill:"none"})),J=()=>React.createElement("svg",{width:"22",height:"22",viewBox:"0 0 24 24",fill:"#17b890"},React.createElement("path",{d:"M4 6h16a1 1 0 0 1 1 1v3a2 2 0 0 0 0 4v3a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-3a2 2 0 0 0 0-4V7a1 1 0 0 1 1-1z"}),React.createElement("path",{d:"M9 9l6 6M9.5 9.5h.01M14.5 14.5h.01",stroke:"#fff",strokeWidth:"1.6",strokeLinecap:"round"})),_=()=>React.createElement("svg",{width:"26",height:"26",viewBox:"0 0 24 24",fill:"none"},React.createElement("circle",{cx:"12",cy:"12",r:"6",fill:"#2a6fdb",stroke:"#fff",strokeWidth:"3"})),K=()=>React.createElement("svg",{width:"30",height:"20",viewBox:"0 0 30 20"},React.createElement("rect",{width:"30",height:"20",rx:"3",fill:"#16161a"}),React.createElement("circle",{cx:"12",cy:"10",r:"5.4",fill:"#eb001b"}),React.createElement("circle",{cx:"18",cy:"10",r:"5.4",fill:"#f79e1b",fillOpacity:".92"})),Q=()=>React.createElement("svg",{width:"34",height:"22",viewBox:"0 0 34 22"},React.createElement("rect",{width:"34",height:"22",rx:"3.5",fill:"#1a1f71"}),React.createElement("text",{x:"17",y:"15.5",textAnchor:"middle",fontFamily:"DM Sans, sans-serif",fontWeight:"800",fontStyle:"italic",fontSize:"11",fill:"#fff",letterSpacing:"0.5"},"VISA")),X=()=>React.createElement("svg",{width:"34",height:"22",viewBox:"0 0 34 22"},React.createElement("rect",{width:"34",height:"22",rx:"3.5",fill:"#f4a93a"}),React.createElement("text",{x:"17",y:"16",textAnchor:"middle",fontFamily:"DM Sans, sans-serif",fontWeight:"800",fontSize:"13",fill:"#fff"},"$")),Z=()=>React.createElement("svg",{width:"30",height:"30",viewBox:"0 0 30 30"},React.createElement("circle",{cx:"15",cy:"15",r:"15",fill:"#f0f0f3"}),React.createElement("path",{d:"M15 9v12M9 15h12",stroke:"#f5793a",strokeWidth:"2.4",strokeLinecap:"round"})),ee=()=>React.createElement("svg",{width:"22",height:"22",viewBox:"0 0 24 24",fill:"none",stroke:"#16161a",strokeWidth:"1.9",strokeLinecap:"round",strokeLinejoin:"round"},React.createElement("path",{d:"M4 5h16a1.5 1.5 0 0 1 1.5 1.5v9A1.5 1.5 0 0 1 20 17H9l-4.5 3.5V17H4a1.5 1.5 0 0 1-1.5-1.5v-9A1.5 1.5 0 0 1 4 5z"}),React.createElement("path",{d:"M8 10.5h8"}));function te({src:e}){return e?React.createElement("img",{className:"home-illo photo",src:e,alt:"",style:{objectFit:"contain"}}):React.createElement("svg",{className:"home-illo art",viewBox:"0 0 360 180","aria-hidden":"true"},React.createElement("ellipse",{cx:"180",cy:"162",rx:"120",ry:"12",fill:"#f0f0f3"}),React.createElement("rect",{x:"62",y:"34",width:"150",height:"116",rx:"14",fill:"#e7eae6"}),React.createElement("path",{d:"M62 82 C 110 70 140 110 212 96",stroke:"#c2d9ea",strokeWidth:"10",fill:"none"}),React.createElement("path",{d:"M100 34 L 120 150 M62 126 L 212 116",stroke:"#fff",strokeWidth:"7",fill:"none"}),React.createElement("path",{d:"M150 40c-15 0-26 11-26 25 0 19 26 43 26 43s26-24 26-43c0-14-11-25-26-25z",fill:"#ff7a08"}),React.createElement("circle",{cx:"150",cy:"65",r:"9",fill:"#fff"}),React.createElement("path",{d:"M216 72h76l-8 82h-60z",fill:"#ff9a3c"}),React.createElement("path",{d:"M216 72h76l-4 14h-68z",fill:"#e8690a"}),React.createElement("path",{d:"M236 72v-10a18 18 0 0 1 36 0v10",stroke:"#16161a",strokeWidth:"4",fill:"none",strokeLinecap:"round"}),React.createElement("circle",{cx:"254",cy:"114",r:"15",fill:"#fff",opacity:".9"}),React.createElement("path",{d:"m247 114 5 5 9-10",stroke:"#07b15f",strokeWidth:"3.5",fill:"none",strokeLinecap:"round",strokeLinejoin:"round"}))}function se(){return React.createElement("svg",{className:"ty-illo art",viewBox:"0 0 400 170","aria-hidden":"true"},React.createElement("ellipse",{cx:"200",cy:"156",rx:"130",ry:"10",fill:"#e6d1a8"}),React.createElement("path",{d:"M150 18h100v132l-10-7-10 7-10-7-10 7-10-7-10 7-10-7-10 7-10-7z",fill:"#fff"}),React.createElement("rect",{x:"166",y:"40",width:"54",height:"7",rx:"3.5",fill:"#16161a"}),React.createElement("rect",{x:"166",y:"60",width:"68",height:"5",rx:"2.5",fill:"#d6d6dd"}),React.createElement("rect",{x:"166",y:"74",width:"60",height:"5",rx:"2.5",fill:"#d6d6dd"}),React.createElement("rect",{x:"166",y:"88",width:"64",height:"5",rx:"2.5",fill:"#d6d6dd"}),React.createElement("rect",{x:"166",y:"108",width:"68",height:"8",rx:"4",fill:"#ff7a08"}),React.createElement("ellipse",{cx:"292",cy:"140",rx:"26",ry:"9",fill:"#d99a1e"}),React.createElement("rect",{x:"266",y:"118",width:"52",height:"22",fill:"#f2b736"}),React.createElement("ellipse",{cx:"292",cy:"118",rx:"26",ry:"9",fill:"#f8cf62"}),React.createElement("text",{x:"292",y:"123",textAnchor:"middle",fontSize:"13",fontWeight:"800",fill:"#b37a0a",fontFamily:"DM Sans, sans-serif"},"\u20A1"),React.createElement("circle",{cx:"118",cy:"62",r:"24",fill:"#07b15f"}),React.createElement("path",{d:"m106 62 8 8 16-17",stroke:"#fff",strokeWidth:"5",fill:"none",strokeLinecap:"round",strokeLinejoin:"round"}))}function ae(){return React.createElement("svg",{className:"help-illo art",viewBox:"0 0 150 130","aria-hidden":"true"},React.createElement("rect",{x:"18",y:"20",width:"80",height:"54",rx:"16",fill:"#ff7a08"}),React.createElement("path",{d:"M36 74 30 92l22-18z",fill:"#ff7a08"}),React.createElement("circle",{cx:"40",cy:"47",r:"5",fill:"#fff"}),React.createElement("circle",{cx:"58",cy:"47",r:"5",fill:"#fff"}),React.createElement("circle",{cx:"76",cy:"47",r:"5",fill:"#fff"}),React.createElement("rect",{x:"70",y:"62",width:"66",height:"44",rx:"14",fill:"#fff"}),React.createElement("path",{d:"M118 106l8 14-20-14z",fill:"#fff"}),React.createElement("rect",{x:"82",y:"78",width:"40",height:"5",rx:"2.5",fill:"#f2c9a6"}),React.createElement("rect",{x:"82",y:"88",width:"28",height:"5",rx:"2.5",fill:"#f2c9a6"}))}function H({profile:e,size:t}){if(e.avatar)return React.createElement("img",{className:"photo",src:e.avatar,alt:""});let s=((e.firstName||"")[0]||"")+((e.lastName||"")[0]||"");return React.createElement("div",{className:"avatar-initials",style:{fontSize:t*.36}},s.toUpperCase())}var we={Completed:"#07b15f",Canceled:"#e0463a"},ie=["#6a1f9c","#b5471f","#1f6f8b","#2f7d4f"];function x(e,t="\u20A1"){return(e<0?"-":"")+t+Math.round(Math.abs(e)).toLocaleString("en-US")}function b(e){let t=e.items.reduce((n,c)=>n+c.price,0),s=e.items.reduce((n,c)=>n+c.qty,0),l=(e.deliveryFee||0)-(e.deliveryCoupon||0),a=(e.serviceFee||0)+(e.tip||0),o=t+l+a,i=(e.deliveryCoupon||0)+(e.saved||0);return{itemTotal:t,itemCount:s,delivery:l,other:a,total:o,saved:i}}function Ce(e){let t=/^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2}))?/.exec(e||"");if(!t)return e||"";let[,s,l,a,o="00",i="00"]=t,n=Number(o),c=n%12===0?12:n%12;return`${a}/${l}/${s} ${c}:${i} ${n<12?"AM":"PM"}`}function oe(e){return[...e].sort((t,s)=>String(s.date).localeCompare(String(t.date))).map((t,s)=>({kind:"Delivery",...t,tint:t.tint||ie[s%ie.length],statusColor:we[t.status]||"#6b6b73",dateLabel:Ce(t.date)}))}function ne(e){let t=[],s=(a,o)=>{a||t.push(o)};if(s(e&&typeof e=="object","The file must contain one JSON object."),t.length)return t;s(Array.isArray(e.orders),'"orders" must be a list.'),s(e.profile&&typeof e.profile=="object",'"profile" is missing.'),s(Array.isArray(e.payments),'"payments" must be a list.');let l=new Set;return(e.orders||[]).forEach((a,o)=>{let i=`orders[${o}]${a&&a.merchant?` (${a.merchant})`:""}`;s(typeof a.id=="string"&&a.id,`${i}: "id" is required.`),s(!l.has(a.id),`${i}: id "${a.id}" is used twice.`),l.add(a.id),s(typeof a.merchant=="string",`${i}: "merchant" is required.`),s(typeof a.orderId=="string",`${i}: "orderId" must be a string in quotes (it is too long for a number).`),s(/^\d{4}-\d{2}-\d{2}/.test(a.date||""),`${i}: "date" must look like 2025-10-15T14:08.`),s(Array.isArray(a.items)&&a.items.length>0,`${i}: "items" needs at least one item.`),(a.items||[]).forEach((n,c)=>{s(Number.isInteger(n.qty)&&n.qty>0,`${i} item ${c+1}: "qty" must be a whole number like 2.`),s(typeof n.name=="string",`${i} item ${c+1}: "name" is required.`),s(typeof n.price=="number",`${i} item ${c+1}: "price" must be a number.`)});for(let n of["deliveryFee","deliveryCoupon","serviceFee","tip"])s(a[n]===void 0||typeof a[n]=="number",`${i}: "${n}" must be a number.`)}),t}var{useState:g,useRef:ce,useLayoutEffect:Me,useContext:Le,createContext:Se}=React,W=Se(null),k=()=>Le(W);function C(){let[e,t]=g(""),s=ce(0),l=o=>{t(o),clearTimeout(s.current),s.current=setTimeout(()=>t(""),1700)},a=React.createElement("div",{className:"toast"+(e?" show":""),role:"status"},e);return[l,a]}var u=e=>`${e} is coming soon`,N=()=>React.createElement("div",{className:"statusbar"});function M({title:e,onBack:t}){return React.createElement("div",{className:"navhead"},React.createElement("button",{className:"nav-back",onClick:t,"aria-label":"Back"},React.createElement(w,null)),React.createElement("div",{className:"nav-title"},e),React.createElement("div",null))}function de({type:e}){return e==="visa"?React.createElement(Q,null):e==="mastercard"?React.createElement(K,null):e==="cash"?React.createElement(X,null):null}function Be(){return React.createElement("svg",{className:"map",viewBox:"0 0 445 640",preserveAspectRatio:"xMidYMid slice","aria-hidden":"true"},React.createElement("rect",{width:"445",height:"640",fill:"#e7eae6"}),React.createElement("ellipse",{cx:"80",cy:"120",rx:"120",ry:"90",fill:"#d7e6cd",opacity:".7"}),React.createElement("ellipse",{cx:"390",cy:"430",rx:"130",ry:"100",fill:"#d7e6cd",opacity:".6"}),React.createElement("path",{d:"M-20 250 C 120 230 160 360 300 350 S 460 300 470 320",fill:"none",stroke:"#c2d9ea",strokeWidth:"20",strokeLinecap:"round"}),React.createElement("g",{stroke:"#d4d7d2",strokeWidth:"20",fill:"none",strokeLinecap:"round"},React.createElement("path",{d:"M-10 90 L 250 130 L 470 90"}),React.createElement("path",{d:"M60 -10 L 110 300 L 70 660"}),React.createElement("path",{d:"M-10 520 L 240 470 L 470 540"}),React.createElement("path",{d:"M330 -10 L 360 320 L 320 660"})),React.createElement("g",{stroke:"#ffffff",strokeWidth:"12",fill:"none",strokeLinecap:"round"},React.createElement("path",{d:"M-10 90 L 250 130 L 470 90"}),React.createElement("path",{d:"M60 -10 L 110 300 L 70 660"}),React.createElement("path",{d:"M-10 520 L 240 470 L 470 540"}),React.createElement("path",{d:"M330 -10 L 360 320 L 320 660"})),React.createElement("g",{fill:"#dde0db"},React.createElement("rect",{x:"150",y:"180",width:"60",height:"44",rx:"5"}),React.createElement("rect",{x:"230",y:"190",width:"48",height:"40",rx:"5"}),React.createElement("rect",{x:"170",y:"380",width:"55",height:"48",rx:"5"}),React.createElement("rect",{x:"250",y:"400",width:"60",height:"40",rx:"5"})))}var Ie=[{key:"trips",label:"My Trips",Ico:E,go:"trips"},{key:"payment",label:"Payment",Ico:q,go:"payment"},{key:"help",label:"Help",Ico:B,go:"help"},{key:"messages",label:"Messages",Ico:G,go:"messages"},{key:"safety",label:"Safety Center",Ico:T},{key:"settings",label:"Settings",Ico:Y},{sep:!0},{key:"invite",label:"Invite Friends",Ico:U},{key:"discounts",label:"Discounts",Ico:J},{key:"scan",label:"Scan",Ico:A}];function he({onGo:e}){let{brand:t,profile:s,images:l}=k(),[a,o]=g(!1),[i,n]=C(),c=d=>{o(!1),setTimeout(()=>e(d),180)},r=d=>d.go?c(d.go):(o(!1),i(u(d.label)));return React.createElement(React.Fragment,null,React.createElement("div",{className:"home-map"},React.createElement(Be,null),React.createElement("button",{className:"map-chip left",onClick:()=>o(!0),"aria-label":"Open menu"},React.createElement(O,null)),React.createElement("button",{className:"map-chip right",onClick:()=>i(u("Scan")),"aria-label":"Scan"},React.createElement(A,null)),React.createElement("button",{className:"safety-chip",onClick:()=>i(u("Safety Toolkit"))},React.createElement(T,{col:"#2a6fdb"})," Safety Toolkit"),React.createElement("span",{className:"home-pin"},React.createElement(_,null))),React.createElement("div",{className:"home-card"},React.createElement(te,{src:l.homeHero}),React.createElement("h2",null,t," isn't available in your area yet"),React.createElement("button",{className:"btn btn-primary",style:{marginBottom:0},onClick:()=>i(u("Address entry"))},"Enter Address")),React.createElement("div",{className:"drawer-scrim"+(a?" show":""),onClick:()=>o(!1)}),React.createElement("nav",{className:"drawer"+(a?" open":""),"aria-hidden":!a},React.createElement("button",{className:"drawer-head",onClick:()=>c("profile"),style:{border:"none",textAlign:"left",cursor:"pointer"}},React.createElement("div",null,React.createElement("div",{className:"dh-name"},s.firstName," ",s.lastName),React.createElement("div",{className:"dh-edit"},"Edit Personal Info ",React.createElement(f,{size:14,w:2.4}))),React.createElement("div",{className:"drawer-avatar"},React.createElement(H,{profile:s,size:58}))),React.createElement("div",{className:"drawer-menu"},Ie.map((d,m)=>d.sep?React.createElement("div",{className:"drawer-sep",key:m}):React.createElement("button",{className:"drawer-item",key:d.key,onClick:()=>r(d),tabIndex:a?0:-1},React.createElement("span",{className:"di-ico"},React.createElement(d.Ico,null)),React.createElement("span",{className:"di-label"},d.label))))),n)}function pe({onOpen:e,onClose:t}){let{orders:s,currency:l}=k(),[a,o]=g("Food");return React.createElement(React.Fragment,null,React.createElement(N,null),React.createElement("div",{className:"trips-head"},React.createElement("button",{className:"trips-close",onClick:t,"aria-label":"Close"},React.createElement(z,null)),React.createElement("h1",null,"My Trips"),React.createElement("div",{className:"trips-tabs",role:"tablist"},["Ride","Food"].map(i=>React.createElement("button",{key:i,role:"tab","aria-selected":a===i,className:"trips-tab"+(a===i?" active":""),onClick:()=>o(i)},i)))),React.createElement("div",{className:"trips-body"},a==="Food"&&s.length>0&&React.createElement(React.Fragment,null,React.createElement("div",{className:"trips-section"},"history"),s.map(i=>{let{total:n,itemCount:c}=b(i);return React.createElement("button",{className:"trip-card",key:i.id,onClick:()=>e(i.id)},React.createElement("div",{className:"trip-row1"},React.createElement("span",{className:"trip-kind"},i.kind),React.createElement("span",{className:"trip-status"+(i.status==="Canceled"?" canceled":"")},i.status," ",React.createElement(f,{size:16,w:2.2}))),React.createElement("div",{className:"trip-when"},React.createElement(V,null)," ",i.dateLabel),React.createElement("div",{className:"trip-merchant"},i.merchant),React.createElement("div",{className:"trip-meta"},"Total of ",c," ",c===1?"item":"items"),React.createElement("div",{className:"trip-meta"},"Total ",x(n,l)))}),React.createElement("div",{style:{height:20}})),a==="Food"&&s.length===0&&React.createElement("div",{className:"trips-empty"},React.createElement("h3",null,"No orders yet"),React.createElement("p",null,"Your food orders will show up here.")),a==="Ride"&&React.createElement("div",{className:"trips-empty"},React.createElement("h3",null,"No rides yet"),React.createElement("p",null,"Your ride history will show up here."))))}function re({item:e}){return React.createElement("div",{className:"item"},React.createElement("div",{className:"qty"},"x",e.qty),React.createElement("div",{className:"item-name"},e.name))}var le=8;function me({order:e,onBack:t,onHelp:s,onItemized:l,onReorder:a}){let{currency:o}=k(),[i,n]=g(!1),[c,r]=g(!1),d=ce(null),[m,p]=g(0),h=e.items.slice(0,le),v=e.items.slice(le),{total:Ne}=b(e);Me(()=>{d.current&&p(d.current.scrollHeight)},[i]);let be=()=>{try{navigator.clipboard.writeText(e.orderId).catch(()=>{})}catch{}r(!0),setTimeout(()=>r(!1),1600)};return React.createElement(React.Fragment,null,React.createElement("div",{className:"banner",style:{background:e.tint}},e.banner?React.createElement("img",{className:"photo",src:e.banner,alt:"",style:{position:"absolute",inset:0}}):React.createElement("div",{className:"banner-mark","aria-hidden":"true"},e.merchant.split(/\s+/).slice(0,2).map(y=>y[0]).join("")),React.createElement("div",{className:"top-controls"},React.createElement("button",{className:"circle-btn","aria-label":"Back",onClick:t},React.createElement(w,null)),React.createElement("button",{className:"help-btn",onClick:s},React.createElement(B,null)," Help"))),React.createElement("div",{className:"sheet"},React.createElement("div",{className:"scroll"},React.createElement("h1",{className:"place-name"},e.merchant,React.createElement("span",{className:"chev"},React.createElement(f,{size:20}))),React.createElement("div",{className:"status-line"},React.createElement("span",{className:"done",style:{color:e.statusColor}},e.status),React.createElement("span",{className:"date"},e.dateLabel)),React.createElement("hr",{className:"rule"}),React.createElement("div",{className:"section-head"},React.createElement("div",{className:"left"},React.createElement(P,null),React.createElement("h2",null,"Ordered Item(s)")),v.length>0&&React.createElement("button",{className:"show-more"+(i?" open":""),onClick:()=>n(y=>!y),"aria-expanded":i},i?"Show less":"Show more",React.createElement("span",{className:"chev"},React.createElement(F,null)))),React.createElement("div",{className:"items"},h.map((y,S)=>React.createElement(re,{key:S,item:y})),v.length>0&&React.createElement("div",{className:"collapsing",style:{height:i?m:0,opacity:i?1:0}},React.createElement("div",{ref:d},v.map((y,S)=>React.createElement(re,{key:S,item:y}))))),React.createElement("hr",{className:"rule"}),React.createElement("div",{className:"total-wrap"},React.createElement("span",{className:"receipt-ico"},React.createElement(D,null)),React.createElement("div",{style:{minWidth:0}},React.createElement("div",{className:"total-line"},"Total: ",x(Ne,o)),React.createElement("div",{className:"order-id"},React.createElement("span",{style:{userSelect:"all"}},"Order ID: ",e.orderId),React.createElement("button",{className:"copy-btn"+(c?" copied":""),onClick:be,"aria-label":"Copy order ID"},React.createElement(c?I:R,null)),c&&React.createElement("span",{className:"copied-toast"},"Copied"))))),React.createElement("div",{className:"footer"},React.createElement("button",{className:"btn btn-primary",onClick:a},"Order Again"),React.createElement("button",{className:"btn btn-secondary",onClick:l},"View receipt"))))}function ve({order:e,onBack:t}){let{brand:s,currency:l}=k(),{itemTotal:a,delivery:o,other:i,total:n,saved:c}=b(e),r=m=>x(m,l),d=e.payment||{};return React.createElement(React.Fragment,null,React.createElement("div",{className:"ty-banner"},React.createElement("button",{className:"ty-back",onClick:t,"aria-label":"Back"},React.createElement(w,null)),React.createElement("h1",null,"Thank you for choosing ",s," Food"),React.createElement(se,null)),React.createElement("div",{className:"ty-body"},React.createElement("div",{className:"ty-total"},React.createElement("span",{className:"lbl"},"Total"),React.createElement("span",{className:"amt"},React.createElement("div",{className:"big"},r(n)),c>0&&React.createElement("div",{className:"saved"},"You saved ",r(c)))),React.createElement("div",{className:"ty-group"},React.createElement("div",{className:"ty-line head"},React.createElement("span",{className:"l",style:{color:"var(--ink)"}},"Food Fee"),React.createElement("span",{className:"r"},r(a))),React.createElement("div",{className:"ty-line"},React.createElement("span",{className:"l"},"Item Total"),React.createElement("span",{className:"r"},r(a)))),React.createElement("div",{className:"ty-group"},React.createElement("div",{className:"ty-line head"},React.createElement("span",{className:"l",style:{color:"var(--ink)"}},"Delivery Fee"),React.createElement("span",{className:"r"},r(o))),React.createElement("div",{className:"ty-line"},React.createElement("span",{className:"l"},"Delivery Fee"),React.createElement("span",{className:"r"},r(e.deliveryFee||0))),e.deliveryCoupon>0&&React.createElement("div",{className:"ty-line"},React.createElement("span",{className:"l disc"},"Delivery Coupons"),React.createElement("span",{className:"r disc"},r(-e.deliveryCoupon)))),React.createElement("div",{className:"ty-group"},React.createElement("div",{className:"ty-line head"},React.createElement("span",{className:"l",style:{color:"var(--ink)"}},"Other Fees"),React.createElement("span",{className:"r"},r(i))),React.createElement("div",{className:"ty-line"},React.createElement("span",{className:"l"},"Service Fee"),React.createElement("span",{className:"r"},r(e.serviceFee||0))),e.tip>0&&React.createElement("div",{className:"ty-line"},React.createElement("span",{className:"l"},"Tip"),React.createElement("span",{className:"r"},r(e.tip)))),React.createElement("div",{className:"ty-pay"},React.createElement("span",{className:"who"},React.createElement(de,{type:d.type})," ",d.type==="cash"?"Cash":`\u2022\u2022\u2022\u2022 ${d.last4||""}`),React.createElement("span",{className:"amt"},r(n)))))}function fe({order:e,onBack:t,onDone:s}){let{currency:l}=k(),[a,o]=g(!1),[i,n]=C(),{itemTotal:c,itemCount:r}=b(e),d=r===1?"item":"items";return React.createElement(React.Fragment,null,React.createElement(N,null),React.createElement(M,{title:"Order again",onBack:t}),React.createElement("div",{className:"scroll",style:{padding:0}},React.createElement("div",{className:"ro-head"},React.createElement("h2",null,"Add these items to your cart"),React.createElement("p",null,"From ",e.merchant)),React.createElement("div",{className:"ro-list"},e.items.map((m,p)=>React.createElement("div",{className:"ro-item",key:p},React.createElement("span",{className:"ro-q"},"x",m.qty),React.createElement("span",{className:"ro-n"},m.name),React.createElement("span",{className:"ro-p"},x(m.price,l)))))),React.createElement("div",{className:"footer"},React.createElement("button",{className:"btn btn-primary",style:{marginBottom:0},onClick:()=>o(!0)},React.createElement(j,null)," Add ",r," ",d," \xB7 ",x(c,l))),a&&React.createElement("div",{className:"ro-success"},React.createElement("div",{className:"ro-check"},React.createElement(I,{size:44,w:3})),React.createElement("h3",null,"Added to your cart"),React.createElement("p",null,r," ",d," from ",e.merchant," are ready to check out."),React.createElement("div",{style:{width:"100%",marginTop:30}},React.createElement("button",{className:"btn btn-primary",onClick:()=>i(u("Checkout"))},"Go to cart"),React.createElement("button",{className:"btn btn-secondary",onClick:s},"Back to orders"))),n)}function ue({onBack:e,onMessages:t}){return React.createElement(React.Fragment,null,React.createElement(N,null),React.createElement(M,{title:"Help",onBack:e}),React.createElement("div",{className:"help-hero"},React.createElement("h2",null,"How can we help you?"),React.createElement(ae,null)),React.createElement("div",{className:"help-card"},React.createElement("button",{className:"help-row",onClick:t},React.createElement(ee,null),React.createElement("span",{className:"hr-label"},"Message History"),React.createElement(f,{size:20,w:2.2}))),React.createElement("div",{className:"help-bg"}))}function ye({onBack:e}){return React.createElement(React.Fragment,null,React.createElement(N,null),React.createElement(M,{title:"Message History",onBack:e}),React.createElement("div",{className:"set-body",style:{background:"var(--pill-bg)"}},React.createElement("div",{className:"trips-empty"},React.createElement("h3",null,"No messages yet"),React.createElement("p",null,"Conversations with support will appear here."))))}function ge({onBack:e}){let{profile:t}=k(),[s,l]=C(),a=[{label:"Mobile Number",value:t.mobile},{label:"Email",value:t.email,flag:t.emailVerified?null:"Unverified"},{label:"Password"},{label:"Third-party Account"},{label:"Device Management"},{label:"Delete Account",danger:!0}];return React.createElement(React.Fragment,null,React.createElement(N,null),React.createElement("div",{className:"trips-head",style:{paddingBottom:6}},React.createElement("button",{className:"trips-close",onClick:e,"aria-label":"Close"},React.createElement(z,null)),React.createElement("h1",null,"My Profile")),React.createElement("div",{className:"set-body"},React.createElement("div",{className:"set-gap"}),React.createElement("button",{className:"prof-head",onClick:()=>s(u("Profile pictures")),style:{width:"100%",background:"none",border:"none",cursor:"pointer"}},React.createElement("div",{className:"prof-avatar"},React.createElement(H,{profile:t,size:78})),React.createElement("span",{className:"prof-edit"},"Edit Profile Picture ",React.createElement(f,{size:18,w:2.2}))),React.createElement("div",{className:"prof-field"},React.createElement("div",{className:"pf-label"},"First Name"),React.createElement("div",{className:"pf-value"},t.firstName)),React.createElement("div",{className:"prof-field"},React.createElement("div",{className:"pf-label"},"Last Name"),React.createElement("div",{className:"pf-value"},t.lastName)),React.createElement("div",{className:"set-gap"}),a.map(o=>React.createElement("button",{className:"set-row",key:o.label,onClick:()=>s(u(o.label))},React.createElement("span",{className:"sr-label",style:o.danger?{color:"var(--red)"}:null},o.label),o.value&&React.createElement("span",{className:"sr-value"},o.value),o.flag&&React.createElement("span",{className:"sr-flag"},o.flag),React.createElement("span",{className:"sr-chev"},React.createElement(f,{size:18,w:2.3}))))),l)}function ke({onBack:e}){let{payments:t}=k(),[s,l]=C(),a=o=>o.label||`${o.type==="visa"?"VISA":"Mastercard"} \u2022\u2022\u2022\u2022 ${o.last4}`;return React.createElement(React.Fragment,null,React.createElement(N,null),React.createElement(M,{title:"Payment Methods",onBack:e}),React.createElement("div",{className:"set-body"},t.map(o=>React.createElement("button",{className:"pay-row",key:o.id,onClick:()=>s(u("Editing "+a(o)))},React.createElement("span",{className:"pay-logo"},React.createElement(de,{type:o.type})),React.createElement("span",{className:"pay-name"},a(o)),React.createElement(f,{size:20,w:2.2}))),React.createElement("button",{className:"pay-row",onClick:()=>s(u("Adding a card"))},React.createElement("span",{className:"pay-logo"},React.createElement(Z,null)),React.createElement("span",{className:"pay-name"},"Credit / Debit Card",React.createElement("div",{className:"pn-sub"},"Visa/MasterCard")),React.createElement(f,{size:20,w:2.2}))),l)}var{useState:xe,useRef:Ae,useMemo:Te}=React;function ze({data:e}){let t=Te(()=>({brand:e.brand||"Pronto",currency:e.currency||"\u20A1",profile:e.profile,payments:e.payments,images:e.images||{},orders:oe(e.orders)}),[e]),s=Ae(1),[l,a]=xe([{key:0,screen:"home"}]),[o,i]=xe(null),n=(p,h={})=>a(v=>[...v,{key:s.current++,screen:p,...h}]),c=p=>a(h=>h.length<=p?h:(i(h[h.length-1]),setTimeout(()=>i(null),320),h.slice(0,p))),r=()=>c(l.length-1),d=()=>c(1),m=p=>{let h=p.orderId?t.orders.find(v=>v.id===p.orderId):null;switch(p.screen){case"home":return React.createElement(he,{onGo:v=>n(v)});case"trips":return React.createElement(pe,{onOpen:v=>n("receipt",{orderId:v}),onClose:r});case"receipt":return React.createElement(me,{order:h,onBack:r,onHelp:()=>n("help"),onItemized:()=>n("itemized",{orderId:h.id}),onReorder:()=>n("reorder",{orderId:h.id})});case"itemized":return React.createElement(ve,{order:h,onBack:r});case"reorder":return React.createElement(fe,{order:h,onBack:r,onDone:d});case"help":return React.createElement(ue,{onBack:r,onMessages:()=>n("messages")});case"messages":return React.createElement(ye,{onBack:r});case"profile":return React.createElement(ge,{onBack:r});case"payment":return React.createElement(ke,{onBack:r});default:return null}};return React.createElement(W.Provider,{value:t},React.createElement("div",{className:"phone"},l.map((p,h)=>React.createElement("div",{className:"screen"+(h>0?" enter":""),key:p.key,style:{zIndex:h+1},inert:h<l.length-1?"":void 0},m(p))),o&&React.createElement("div",{className:"screen exit",key:"ex"+o.key,style:{zIndex:999}},m(o))))}function He({errors:e}){return React.createElement("div",{className:"boot-error"},React.createElement("h1",null,"The order data has a problem"),React.createElement("p",null,"Fix these in data/app-data.json and rebuild:"),React.createElement("ul",null,e.map((t,s)=>React.createElement("li",{key:s},t))))}var We=document.getElementById("root"),$=null,L=[];try{$=JSON.parse(document.getElementById("app-data").textContent),L=ne($)}catch(e){L=["app-data.json is not valid JSON: "+e.message]}ReactDOM.createRoot(We).render(L.length?React.createElement(He,{errors:L}):React.createElement(ze,{data:$}));})();
+</script>
+</body>
+</html>

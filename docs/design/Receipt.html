@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Order Flow</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700;9..40,800&display=swap" rel="stylesheet" />
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="image-slot.js"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<style>
+  :root {
+    --green: #07b15f;
+    --ink: #16161a;
+    --muted: #9a9aa2;
+    --pill-bg: #f0f0f3;
+    --pill-ink: #6f6f78;
+    --hair: #ededf0;
+    --banner: #6a1f9c;
+    --accent: #ff7a08;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; height: 100%;
+    background: #c9c9cf;
+    font-family: "DM Sans", system-ui, -apple-system, sans-serif;
+    color: var(--ink);
+  }
+  #root { min-height: 100%; display: flex; align-items: center; justify-content: center; }
+
+  .phone {
+    width: 445px; max-width: 100vw;
+    height: 942px; max-height: 100vh;
+    background: #fff; position: relative; overflow: hidden;
+  }
+  @media (max-width: 460px) { .phone { width: 100vw; } }
+
+  /* ---------- screen stack + transitions ---------- */
+  .screen {
+    position: absolute; inset: 0; background: #fff;
+    display: flex; flex-direction: column;
+    will-change: transform; overflow: hidden;
+  }
+  @keyframes slideInRight { from { transform: translateX(100%); } to { transform: translateX(0); } }
+  @keyframes slideOutRight { from { transform: translateX(0); } to { transform: translateX(100%); } }
+  .screen.enter { animation: slideInRight .28s cubic-bezier(.32,.72,.34,1) both; box-shadow: -14px 0 30px rgba(0,0,0,.12); }
+  .screen.exit  { animation: slideOutRight .26s cubic-bezier(.4,0,.6,1) both; box-shadow: -14px 0 30px rgba(0,0,0,.12); }
+  .phone.no-anim .screen.enter, .phone.no-anim .screen.exit { animation-duration: .001s; box-shadow: none; }
+
+  /* ---------- status bar ---------- */
+  .statusbar {
+    height: 44px; flex: none;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 20px; color: #fff; z-index: 5;
+  }
+  .statusbar.dark { color: var(--ink); }
+  .statusbar.over { position: absolute; top: 0; left: 0; right: 0; pointer-events: none; }
+  .sb-time { display: flex; align-items: center; gap: 6px; font-weight: 700; font-size: 16px; letter-spacing: .2px; }
+  .sb-right { display: flex; align-items: center; gap: 7px; }
+  .battery { display: flex; align-items: center; gap: 4px; }
+  .battery .pct { font-weight: 700; font-size: 13px; }
+
+  /* ---------- nav header ---------- */
+  .navhead {
+    height: 54px; flex: none;
+    display: grid; grid-template-columns: 44px 1fr 44px; align-items: center;
+    padding: 0 10px; border-bottom: 1px solid var(--hair);
+  }
+  .nav-back {
+    width: 40px; height: 40px; border-radius: 50%; border: none; background: none;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    transition: background .15s, transform .12s;
+  }
+  .nav-back:hover { background: #f3f3f5; }
+  .nav-back:active { transform: scale(.9); }
+  .nav-title { text-align: center; font-size: 18px; font-weight: 700; letter-spacing: -.2px; }
+
+  /* ---------- receipt banner ---------- */
+  .banner { position: relative; height: 250px; flex: none; background: var(--banner); overflow: hidden; }
+  .banner image-slot { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  .banner::after {
+    content: ""; position: absolute; inset: 0;
+    background: linear-gradient(180deg, rgba(0,0,0,.28) 0%, rgba(0,0,0,0) 24%, rgba(0,0,0,0) 60%, rgba(0,0,0,.1) 100%);
+    pointer-events: none;
+  }
+  .top-controls {
+    position: absolute; top: 58px; left: 0; right: 0;
+    display: flex; align-items: center; justify-content: space-between; padding: 0 18px; z-index: 6;
+  }
+  .circle-btn {
+    width: 40px; height: 40px; border-radius: 50%; background: #fff; border: none; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 2px 10px rgba(0,0,0,.18); transition: transform .12s ease;
+  }
+  .circle-btn:active { transform: scale(.92); }
+  .help-btn {
+    height: 40px; border-radius: 20px; border: none; cursor: pointer; background: #fff;
+    padding: 0 16px 0 12px; display: flex; align-items: center; gap: 8px;
+    font-weight: 700; font-size: 16px; color: var(--ink);
+    box-shadow: 0 2px 10px rgba(0,0,0,.18); transition: transform .12s ease;
+  }
+  .help-btn:active { transform: scale(.95); }
+
+  /* ---------- receipt sheet ---------- */
+  .sheet { position: relative; margin-top: -22px; background: #fff; border-radius: 22px 22px 0 0; flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; z-index: 4; }
+  .scroll { flex: 1 1 auto; overflow-y: auto; padding: 26px 22px 8px; }
+  .scroll::-webkit-scrollbar { width: 0; }
+
+  .place-name { display: flex; align-items: center; gap: 6px; font-size: 27px; font-weight: 700; letter-spacing: -.4px; line-height: 1.12; margin: 0; }
+  .place-name .chev { flex: none; color: #2a2a30; margin-top: 2px; }
+  .status-line { margin-top: 9px; font-size: 14.5px; font-weight: 500; }
+  .status-line .done { font-weight: 700; }
+  .status-line .date { color: var(--muted); margin-left: 6px; }
+
+  .rule { height: 1px; background: var(--hair); margin: 20px 0; border: 0; }
+
+  .section-head { display: flex; align-items: center; justify-content: space-between; }
+  .section-head .left { display: flex; align-items: center; gap: 12px; }
+  .section-head h2 { margin: 0; font-size: 21px; font-weight: 700; letter-spacing: -.2px; }
+  .show-more { display: flex; align-items: center; gap: 6px; background: none; border: none; cursor: pointer; font-family: inherit; color: var(--ink); font-size: 16.5px; font-weight: 600; padding: 4px 2px; }
+  .show-more .chev { transition: transform .22s ease; }
+  .show-more.open .chev { transform: rotate(180deg); }
+
+  .items { margin-top: 6px; }
+  .item { display: flex; align-items: flex-start; gap: 16px; padding: 14px 0; }
+  .qty { flex: none; margin-top: 1px; min-width: 34px; height: 23px; padding: 0 9px; border-radius: 7px; background: var(--pill-bg); color: var(--pill-ink); font-size: 13px; font-weight: 600; display: flex; align-items: center; justify-content: center; }
+  .item-name { font-size: 17px; font-weight: 700; line-height: 1.3; letter-spacing: -.1px; }
+  .collapsing { overflow: hidden; transition: height .28s ease, opacity .2s ease; }
+
+  .total-wrap { padding: 6px 0 2px; display: flex; gap: 16px; align-items: flex-start; }
+  .receipt-ico { flex: none; margin-top: 4px; }
+  .total-line { font-size: 22px; font-weight: 800; letter-spacing: -.3px; }
+  .order-id { margin-top: 5px; display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 14.5px; font-weight: 500; }
+  .copy-btn { background: none; border: none; cursor: pointer; color: var(--muted); padding: 2px; display: flex; transition: color .15s, transform .12s; }
+  .copy-btn:active { transform: scale(.85); }
+  .copy-btn.copied { color: var(--green); }
+  .copied-toast { font-size: 12.5px; font-weight: 700; color: var(--green); }
+
+  /* ---------- footer / buttons ---------- */
+  .footer { flex: none; padding: 14px 20px 26px; background: #fff; box-shadow: 0 -8px 18px rgba(0,0,0,.04); }
+  .btn { width: 100%; height: 58px; border-radius: 14px; font-family: inherit; font-size: 19px; font-weight: 700; cursor: pointer; border: none; transition: transform .12s ease, box-shadow .15s ease; display: flex; align-items: center; justify-content: center; gap: 9px; }
+  .btn:active { transform: scale(.985); }
+  .btn-primary { color: #fff; background: linear-gradient(95deg, color-mix(in oklab, var(--accent) 74%, #fff) 0%, var(--accent) 60%, color-mix(in oklab, var(--accent) 80%, #d83a00) 100%); box-shadow: 0 8px 18px color-mix(in oklab, var(--accent) 36%, transparent); margin-bottom: 12px; }
+  .btn-secondary { color: var(--ink); background: #fff; border: 1.6px solid #e4e4e8; }
+  .btn-secondary:active { background: #fafafa; }
+
+  /* ---------- order list ---------- */
+  .list-head { padding: 6px 22px 14px; }
+  .list-head h1 { margin: 0; font-size: 30px; font-weight: 800; letter-spacing: -.6px; }
+  .list-head p { margin: 4px 0 0; color: var(--muted); font-size: 14.5px; font-weight: 500; }
+  .ord-cards { padding: 4px 14px 20px; display: flex; flex-direction: column; }
+  .ord-card { display: flex; align-items: center; gap: 14px; width: 100%; text-align: left; background: none; border: none; cursor: pointer; font-family: inherit; padding: 13px 8px; border-radius: 16px; transition: background .15s; }
+  .ord-card:hover { background: #f7f7f9; }
+  .ord-card:active { background: #f0f0f3; }
+  .ord-thumb { width: 56px; height: 56px; border-radius: 16px; flex: none; display: flex; align-items: center; justify-content: center; color: #fff; }
+  .ord-main { flex: 1 1 auto; min-width: 0; }
+  .ord-row1 { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+  .ord-name { font-size: 17px; font-weight: 700; letter-spacing: -.2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ord-total { font-size: 16px; font-weight: 700; flex: none; }
+  .ord-row2 { margin-top: 3px; font-size: 13.5px; font-weight: 500; color: var(--muted); }
+  .ord-status { font-weight: 700; }
+  .ord-row3 { margin-top: 2px; font-size: 13px; color: var(--muted); font-weight: 500; }
+  .ord-chev { flex: none; color: #c4c4cc; }
+  .ord-divider { height: 1px; background: var(--hair); margin: 0 16px; }
+
+  /* ---------- itemized receipt ---------- */
+  .doc { padding: 22px 24px 28px; }
+  .doc-store { font-size: 22px; font-weight: 800; letter-spacing: -.3px; }
+  .doc-meta { margin-top: 6px; color: var(--muted); font-size: 13.5px; font-weight: 500; line-height: 1.5; }
+  .doc-dash { border: 0; border-top: 1.5px dashed #d6d6dd; margin: 20px 0; }
+  .doc-line { display: flex; align-items: flex-start; gap: 12px; padding: 9px 0; }
+  .doc-line .q { font-family: "DM Mono", monospace; font-size: 13px; color: var(--pill-ink); flex: none; min-width: 26px; padding-top: 1px; }
+  .doc-line .n { flex: 1 1 auto; font-size: 15px; font-weight: 600; line-height: 1.35; }
+  .doc-line .p { font-family: "DM Mono", monospace; font-size: 14px; font-weight: 500; flex: none; padding-top: 1px; }
+  .doc-sumrow { display: flex; justify-content: space-between; padding: 6px 0; font-size: 14.5px; }
+  .doc-sumrow .lbl { color: var(--muted); font-weight: 500; }
+  .doc-sumrow .val { font-family: "DM Mono", monospace; font-weight: 500; }
+  .doc-total { display: flex; justify-content: space-between; align-items: baseline; padding: 12px 0 0; }
+  .doc-total .lbl { font-size: 18px; font-weight: 800; }
+  .doc-total .val { font-family: "DM Mono", monospace; font-size: 20px; font-weight: 700; }
+
+  /* ---------- reorder ---------- */
+  .ro-head { padding: 22px 24px 6px; }
+  .ro-head h2 { margin: 0; font-size: 23px; font-weight: 800; letter-spacing: -.3px; }
+  .ro-head p { margin: 5px 0 0; color: var(--muted); font-size: 14.5px; font-weight: 500; }
+  .ro-list { padding: 8px 24px 8px; }
+  .ro-item { display: flex; align-items: center; gap: 14px; padding: 12px 0; border-bottom: 1px solid var(--hair); }
+  .ro-item:last-child { border-bottom: 0; }
+  .ro-q { width: 30px; height: 30px; border-radius: 9px; background: var(--pill-bg); color: var(--pill-ink); font-size: 13px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex: none; }
+  .ro-n { flex: 1 1 auto; font-size: 15px; font-weight: 600; line-height: 1.3; }
+  .ro-p { font-family: "DM Mono", monospace; font-size: 14px; font-weight: 500; flex: none; }
+  .ro-success { position: absolute; inset: 0; background: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 40px; z-index: 10; }
+  .ro-check { width: 92px; height: 92px; border-radius: 50%; background: color-mix(in oklab, var(--green) 14%, #fff); display: flex; align-items: center; justify-content: center; color: var(--green); margin-bottom: 24px; animation: pop .4s cubic-bezier(.2,1.3,.4,1) both; }
+  @keyframes pop { from { transform: scale(.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  .ro-success h3 { margin: 0; font-size: 24px; font-weight: 800; letter-spacing: -.3px; }
+  .ro-success p { margin: 8px 0 0; color: var(--muted); font-size: 15px; font-weight: 500; max-width: 260px; line-height: 1.45; }
+
+  /* ---------- help ---------- */
+  .help-ctx { margin: 18px 22px 6px; padding: 14px; border: 1px solid var(--hair); border-radius: 16px; display: flex; align-items: center; gap: 13px; }
+  .help-ctx .ord-thumb { width: 46px; height: 46px; border-radius: 13px; }
+  .help-ctx .ht-name { font-size: 15.5px; font-weight: 700; }
+  .help-ctx .ht-id { font-size: 12.5px; color: var(--muted); margin-top: 2px; font-family: "DM Mono", monospace; }
+  .help-list { padding: 10px 22px; }
+  .help-topic { border-bottom: 1px solid var(--hair); }
+  .help-q { width: 100%; background: none; border: none; cursor: pointer; font-family: inherit; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 17px 2px; font-size: 16px; font-weight: 600; color: var(--ink); text-align: left; }
+  .help-q .tchev { flex: none; color: #b6b6bf; transition: transform .22s ease; }
+  .help-topic.open .tchev { transform: rotate(90deg); color: var(--ink); }
+  .help-a { overflow: hidden; transition: height .26s ease, opacity .2s ease; }
+  .help-a-inner { padding: 0 2px 16px; color: #555; font-size: 14.5px; line-height: 1.5; font-weight: 500; }
+  .toast { position: absolute; left: 50%; bottom: 104px; transform: translateX(-50%) translateY(10px); background: #16161a; color: #fff; padding: 11px 18px; border-radius: 12px; font-size: 14px; font-weight: 600; opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; z-index: 20; white-space: nowrap; }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* ---------- home / map ---------- */
+  .home-map { position: absolute; inset: 0; background: #e7eae6; overflow: hidden; }
+  .home-map svg.map { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .map-chip { position: absolute; top: 60px; width: 46px; height: 46px; border-radius: 50%; background: #fff; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 3px 12px rgba(0,0,0,.14); transition: transform .12s; z-index: 6; }
+  .map-chip:active { transform: scale(.92); }
+  .map-chip.left { left: 18px; }
+  .map-chip.right { right: 18px; }
+  .safety-chip { position: absolute; left: 18px; top: 122px; display: flex; align-items: center; gap: 9px; background: #fff; border: none; cursor: pointer; padding: 11px 16px 11px 12px; border-radius: 14px; box-shadow: 0 3px 12px rgba(0,0,0,.12); font-family: inherit; font-size: 15px; font-weight: 700; color: var(--ink); z-index: 6; }
+  .home-pin { position: absolute; left: 52%; top: 44%; z-index: 4; filter: drop-shadow(0 4px 6px rgba(0,0,0,.25)); }
+  .home-card { position: absolute; left: 0; right: 0; bottom: 0; background: #fff; border-radius: 26px 26px 0 0; padding: 30px 26px 30px; box-shadow: 0 -10px 30px rgba(0,0,0,.12); z-index: 5; text-align: center; }
+  .home-illo { width: 100%; height: 180px; display: block; margin: 0 auto 18px; }
+  .home-card h2 { margin: 0 0 22px; font-size: 30px; font-weight: 800; letter-spacing: -.7px; line-height: 1.12; text-align: left; }
+
+  /* ---------- side drawer ---------- */
+  .drawer-scrim { position: absolute; inset: 0; background: rgba(20,20,26,.4); opacity: 0; pointer-events: none; transition: opacity .28s ease; z-index: 40; }
+  .drawer-scrim.show { opacity: 1; pointer-events: auto; }
+  .drawer { position: absolute; top: 0; bottom: 0; left: 0; width: 80%; max-width: 340px; background: #fff; border-radius: 0 24px 24px 0; transform: translateX(-100%); transition: transform .3s cubic-bezier(.32,.72,.34,1); z-index: 41; display: flex; flex-direction: column; box-shadow: 14px 0 40px rgba(0,0,0,.18); }
+  .drawer.open { transform: translateX(0); }
+  .drawer-head { background: linear-gradient(160deg, #eef0f3 0%, #f7f8fa 60%); padding: 64px 22px 22px; display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
+  .drawer-head .dh-name { font-size: 21px; font-weight: 800; letter-spacing: -.4px; }
+  .drawer-head .dh-edit { margin-top: 6px; display: flex; align-items: center; gap: 3px; color: var(--muted); font-size: 13.5px; font-weight: 600; }
+  .drawer-avatar { width: 58px; height: 58px; border-radius: 50%; flex: none; background: #d3d5da; display: flex; align-items: center; justify-content: center; color: #fff; overflow: hidden; }
+  .drawer-menu { flex: 1 1 auto; overflow-y: auto; padding: 14px 8px; }
+  .drawer-item { display: flex; align-items: center; gap: 18px; width: 100%; background: none; border: none; cursor: pointer; font-family: inherit; padding: 15px 16px; border-radius: 12px; text-align: left; transition: background .15s; }
+  .drawer-item:hover { background: #f5f5f7; }
+  .drawer-item:active { background: #eeeef1; }
+  .drawer-item .di-ico { width: 26px; display: flex; justify-content: center; flex: none; }
+  .drawer-item .di-label { font-size: 17px; font-weight: 600; }
+  .drawer-sep { height: 1px; background: var(--hair); margin: 8px 22px; }
+
+  /* ---------- my trips ---------- */
+  .trips-head { padding: 4px 22px 0; }
+  .trips-close { width: 38px; height: 38px; margin-left: -8px; border: none; background: none; cursor: pointer; display: flex; align-items: center; }
+  .trips-head h1 { margin: 8px 0 14px; font-size: 28px; font-weight: 800; letter-spacing: -.5px; }
+  .trips-tabs { display: grid; grid-template-columns: 1fr 1fr; }
+  .trips-tab { background: none; border: none; cursor: pointer; font-family: inherit; font-size: 18px; font-weight: 600; color: var(--muted); padding: 8px 0 14px; position: relative; }
+  .trips-tab.active { color: var(--accent); font-weight: 700; }
+  .trips-tab.active::after { content: ""; position: absolute; left: 50%; bottom: 0; transform: translateX(-50%); width: 64px; height: 3px; border-radius: 2px; background: var(--accent); }
+  .trips-body { flex: 1 1 auto; overflow-y: auto; background: #f0f0f3; }
+  .trips-body::-webkit-scrollbar { width: 0; }
+  .trips-section { color: var(--muted); font-size: 14px; font-weight: 500; padding: 16px 22px 6px; }
+  .trip-card { background: #fff; margin: 0 0 10px; padding: 18px 22px; cursor: pointer; transition: background .12s; }
+  .trip-card:active { background: #fafafa; }
+  .trip-row1 { display: flex; align-items: center; justify-content: space-between; }
+  .trip-kind { font-size: 15px; font-weight: 600; }
+  .trip-status { display: flex; align-items: center; gap: 5px; color: #6b6b73; font-size: 15px; font-weight: 500; }
+  .trip-status.canceled { color: #e0463a; }
+  .trip-when { margin-top: 12px; display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 500; }
+  .trip-merchant { margin-top: 10px; font-size: 16px; font-weight: 600; }
+  .trip-meta { margin-top: 4px; color: var(--muted); font-size: 14px; font-weight: 500; }
+  .trips-empty { padding: 80px 30px; text-align: center; color: var(--muted); }
+  .trips-empty h3 { margin: 0 0 6px; font-size: 18px; font-weight: 700; color: var(--ink); }
+  .trips-empty p { margin: 0; font-size: 14.5px; }
+
+  /* ---------- itemized (thank you) ---------- */
+  .ty-banner { position: relative; background: #f4e3c1; padding: 0 24px 22px; flex: none; }
+  .ty-back { position: absolute; top: 56px; left: 14px; width: 40px; height: 40px; border: none; background: none; cursor: pointer; display: flex; align-items: center; z-index: 3; }
+  .ty-banner h1 { margin: 0; padding-top: 96px; font-size: 28px; font-weight: 800; letter-spacing: -.6px; line-height: 1.14; }
+  .ty-illo { width: 100%; height: 170px; display: block; margin-top: 6px; }
+  .ty-body { flex: 1 1 auto; overflow-y: auto; }
+  .ty-body::-webkit-scrollbar { width: 0; }
+  .ty-total { display: flex; align-items: flex-start; justify-content: space-between; padding: 22px 24px 20px; }
+  .ty-total .lbl { font-size: 21px; font-weight: 800; }
+  .ty-total .amt { text-align: right; }
+  .ty-total .amt .big { font-size: 30px; font-weight: 800; letter-spacing: -.6px; }
+  .ty-total .amt .saved { margin-top: 3px; font-size: 14px; font-weight: 600; color: var(--accent); }
+  .ty-group { border-top: 1px solid var(--hair); padding: 4px 24px; }
+  .ty-line { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 11px 0; }
+  .ty-line .l, .ty-line .r { white-space: nowrap; }
+  .ty-line.head .l, .ty-line.head .r { font-size: 17px; font-weight: 800; }
+  .ty-line .l { color: var(--muted); font-size: 15px; font-weight: 500; }
+  .ty-line .r { font-size: 15px; font-weight: 600; }
+  .ty-line .r.disc, .ty-line .l.disc { color: var(--accent); }
+  .ty-pay { display: flex; align-items: center; justify-content: space-between; border-top: 1px solid var(--hair); padding: 18px 24px 30px; }
+  .ty-pay .who { display: flex; align-items: center; gap: 11px; font-size: 18px; font-weight: 700; }
+  .ty-pay .amt { font-size: 18px; font-weight: 700; }
+
+  /* ---------- help (redesigned) ---------- */
+  .help-hero { position: relative; background: linear-gradient(180deg, #fdeee3 0%, #fbf3ec 100%); padding: 26px 22px 30px; overflow: hidden; }
+  .help-hero h2 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -.3px; max-width: 60%; }
+  .help-hero .help-illo { position: absolute; right: 6px; bottom: -6px; width: 150px; height: 130px; }
+  .help-card { margin: -18px 18px 0; position: relative; z-index: 2; background: #fff; border-radius: 16px; box-shadow: 0 8px 24px rgba(0,0,0,.08); }
+  .help-card .help-row { display: flex; align-items: center; gap: 16px; padding: 20px 18px; width: 100%; background: none; border: none; cursor: pointer; font-family: inherit; }
+  .help-card .help-row .hr-label { flex: 1 1 auto; text-align: left; font-size: 17px; font-weight: 600; }
+  .help-bg { flex: 1 1 auto; background: #f0f0f3; }
+
+  /* ---------- generic settings list (profile / payment) ---------- */
+  .set-body { flex: 1 1 auto; overflow-y: auto; background: #fff; }
+  .set-body::-webkit-scrollbar { width: 0; }
+  .set-gap { height: 12px; background: #f0f0f3; }
+  .set-pad { padding: 4px 22px; }
+
+  .prof-head { display: flex; align-items: center; justify-content: space-between; padding: 22px 22px; }
+  .prof-avatar { width: 78px; height: 78px; border-radius: 50%; background: #ececed; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+  .prof-edit { display: flex; align-items: center; gap: 4px; font-size: 17px; font-weight: 700; color: var(--ink); }
+  .prof-field { padding: 16px 22px; border-top: 1px solid var(--hair); }
+  .prof-field .pf-label { font-size: 13.5px; color: var(--muted); font-weight: 500; }
+  .prof-field .pf-value { margin-top: 5px; font-size: 18px; font-weight: 700; }
+  .set-row { display: flex; align-items: center; gap: 14px; width: 100%; background: none; border: none; cursor: pointer; font-family: inherit; padding: 19px 22px; border-top: 1px solid var(--hair); text-align: left; transition: background .12s; }
+  .set-row:active { background: #fafafa; }
+  .set-row .sr-label { flex: 1 1 auto; font-size: 17px; font-weight: 600; }
+  .set-row .sr-value { color: var(--muted); font-size: 15.5px; font-weight: 500; }
+  .set-row .sr-flag { color: #e0463a; font-size: 15.5px; font-weight: 600; }
+  .set-row .sr-chev { color: #c4c4cc; flex: none; }
+
+  /* ---------- payment methods ---------- */
+  .pay-row { display: flex; align-items: center; gap: 16px; width: 100%; background: none; border: none; cursor: pointer; font-family: inherit; padding: 20px 22px; border-bottom: 1px solid var(--hair); text-align: left; transition: background .12s; }
+  .pay-row:active { background: #fafafa; }
+  .pay-logo { width: 38px; flex: none; display: flex; align-items: center; }
+  .pay-name { flex: 1 1 auto; font-size: 18px; font-weight: 700; }
+  .pay-name .pn-sub { font-size: 13.5px; font-weight: 500; color: var(--muted); margin-top: 2px; }
+  .pay-dots { letter-spacing: 1px; }
+</style>
+</head>
+<body>
+<div id="root" style="align-items: center"></div>
+
+<script type="text/babel" data-presets="react">
+const { useState, useRef, useLayoutEffect, useEffect } = React;
+
+/* =====================  ICONS  ===================== */
+const LocArrow = () => (<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M21 3 3 10.5l7.2 2.3L12.5 20 21 3z"/></svg>);
+const Dots = () => (<svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor">{[4,12,20].map(y=>[4,12,20].map(x=>(<circle key={x+'-'+y} cx={x} cy={y} r="1.7"/>)))}</svg>);
+const Wifi = () => (<svg width="19" height="15" viewBox="0 0 20 15" fill="currentColor"><path d="M10 14.2 12.4 11c-1.4-1.1-3.4-1.1-4.8 0L10 14.2zM5.2 8.1c2.8-2.4 6.8-2.4 9.6 0l1.7-2.1C12.8 2.7 7.2 2.7 3.5 6L5.2 8.1zM10 0C6.4 0 3 1.3.3 3.6L2 5.7c2.2-1.9 5-3 8-3s5.8 1.1 8 3l1.7-2.1C17 1.3 13.6 0 10 0z"/></svg>);
+const Battery = () => (<svg width="26" height="14" viewBox="0 0 26 14" fill="none"><rect x="1" y="1.5" width="21" height="11" rx="3" stroke="currentColor" strokeOpacity=".5" strokeWidth="1.4"/><rect x="3" y="3.4" width="9" height="7.2" rx="1.6" fill="#ff3b30"/><rect x="23.2" y="5" width="2" height="4" rx="1" fill="currentColor" fillOpacity=".5"/></svg>);
+const Chevron = ({size=22, w=2.6}) => (<svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={w} strokeLinecap="round" strokeLinejoin="round"><path d="m9 6 6 6-6 6"/></svg>);
+const ChevDown = ({size=20}) => (<svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>);
+const Back = ({col="#1c1c22"}) => (<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={col} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m15 6-6 6 6 6"/></svg>);
+const Headset = () => (<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#16161a" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M4.4 13.4v-1.6a7.6 7.6 0 0 1 15.2 0v1.6"/><rect x="2.5" y="12.2" width="3.7" height="6.6" rx="1.85" fill="#16161a" stroke="none"/><rect x="17.8" y="12.2" width="3.7" height="6.6" rx="1.85" fill="#16161a" stroke="none"/><path d="M19.6 18.8v.5a3 3 0 0 1-3 3h-3.1"/><circle cx="12.6" cy="22.3" r="1.15" fill="#16161a" stroke="none"/></svg>);
+const Cloche = ({size=26}) => (<svg width={size} height={size*24/26} viewBox="0 0 26 24" fill="currentColor"><rect x="11.7" y="3.4" width="2.6" height="3.1" rx="1.3"/><path d="M3.4 16.7C3.4 11.4 7.7 7.1 13 7.1s9.6 4.3 9.6 9.6H3.4z"/><rect x="2.3" y="16.5" width="21.4" height="2.7" rx="1.35"/></svg>);
+const ReceiptIco = () => (<svg width="22" height="26" viewBox="0 0 24 26" fill="#16161a"><path d="M4 5.2C4 3.4 5.4 2 7.2 2h9.6C18.6 2 20 3.4 20 5.2V21.9L17.7 20 15.4 22 13.1 20 10.8 22 8.5 20 6.2 22 4 20.1V5.2z"/><rect x="7.5" y="9.4" width="9" height="2.1" rx="1.05" fill="#fff"/><rect x="7.5" y="13" width="9" height="2.1" rx="1.05" fill="#fff"/></svg>);
+const CopyIco = () => (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="11" height="11" rx="2.4"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>);
+const CheckIco = ({size=16,w=2.6}) => (<svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={w} strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>);
+const PlusIco = () => (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round"><path d="M12 5v14M5 12h14"/></svg>);
+const ChatIco = () => (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-11.9 7.6L3 21l1.9-6.1A8.4 8.4 0 1 1 21 11.5z"/></svg>);
+const ShareIco = () => (<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 15V3M8 7l4-4 4 4M5 12v7a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-7"/></svg>);
+const Menu = () => (<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1c1c22" strokeWidth="2.3" strokeLinecap="round"><path d="M4 7h16M4 12h16M4 17h11"/></svg>);
+const Scan = ({col="#1c1c22"}) => (<svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke={col} strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/></svg>);
+const Shield = ({col="#2a6fdb"}) => (<svg width="22" height="22" viewBox="0 0 24 24" fill={col}><path d="M12 2 4 5v6c0 5 3.4 8.5 8 11 4.6-2.5 8-6 8-11V5l-8-3z"/><path d="m8.5 12 2.2 2.2L15.5 9.5" stroke="#fff" strokeWidth="1.9" fill="none" strokeLinecap="round" strokeLinejoin="round"/></svg>);
+const Close = () => (<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#1c1c22" strokeWidth="2.3" strokeLinecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>);
+const Clock = () => (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9a9aa2" strokeWidth="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2" strokeLinecap="round" strokeLinejoin="round"/></svg>);
+const Book = () => (<svg width="22" height="22" viewBox="0 0 24 24" fill="#f5793a"><rect x="4" y="3" width="15" height="18" rx="2.5"/><rect x="4" y="3" width="4" height="18" rx="2" fill="#d95f24"/></svg>);
+const Wallet = () => (<svg width="22" height="22" viewBox="0 0 24 24" fill="#17b890"><rect x="3" y="6" width="18" height="13" rx="3"/><rect x="14" y="10.5" width="6" height="4.5" rx="2.2" fill="#0e8e6e"/></svg>);
+const Chat = () => (<svg width="22" height="22" viewBox="0 0 24 24" fill="#17b890"><path d="M4 5h16a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H9l-4 4v-4H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z"/></svg>);
+const Gear = () => (<svg width="22" height="22" viewBox="0 0 24 24" fill="#2a6fdb"><path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zm9 4-1.9-.6a7 7 0 0 0-.5-1.2l1-1.7-1.4-1.4-1.7 1a7 7 0 0 0-1.2-.5L14 4h-2l-.6 1.9a7 7 0 0 0-1.2.5l-1.7-1L7.1 6.8l1 1.7a7 7 0 0 0-.5 1.2L5.7 10v4l1.9.6c.1.4.3.8.5 1.2l-1 1.7 1.4 1.4 1.7-1c.4.2.8.4 1.2.5L12 22h2l.6-1.9c.4-.1.8-.3 1.2-.5l1.7 1 1.4-1.4-1-1.7c.2-.4.4-.8.5-1.2L21 16v-4z"/><circle cx="12" cy="12" r="3.4" fill="#fff"/></svg>);
+const Gift = () => (<svg width="22" height="22" viewBox="0 0 24 24" fill="#f5793a"><rect x="3" y="8" width="18" height="4" rx="1"/><rect x="4.5" y="12" width="15" height="9" rx="1.5"/><rect x="11" y="8" width="2" height="13" fill="#d95f24"/><path d="M12 8c-2-3-6-2-5 0M12 8c2-3 6-2 5 0" stroke="#f5793a" strokeWidth="1.8" fill="none"/></svg>);
+const Ticket = () => (<svg width="22" height="22" viewBox="0 0 24 24" fill="#17b890"><path d="M4 6h16a1 1 0 0 1 1 1v3a2 2 0 0 0 0 4v3a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-3a2 2 0 0 0 0-4V7a1 1 0 0 1 1-1z"/><path d="M9 9l6 6M9.5 9.5h.01M14.5 14.5h.01" stroke="#fff" strokeWidth="1.6" strokeLinecap="round"/></svg>);
+const Pin = () => (<svg width="26" height="26" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="6" fill="#2a6fdb" stroke="#fff" strokeWidth="3"/></svg>);
+const CardLogo = () => (<svg width="30" height="20" viewBox="0 0 30 20"><rect width="30" height="20" rx="3" fill="#16161a"/><circle cx="12" cy="10" r="5.4" fill="#eb001b"/><circle cx="18" cy="10" r="5.4" fill="#f79e1b" fillOpacity=".92"/></svg>);
+const VisaLogo = () => (<svg width="34" height="22" viewBox="0 0 34 22"><rect width="34" height="22" rx="3.5" fill="#1a1f71"/><text x="17" y="15.5" textAnchor="middle" fontFamily="DM Sans, sans-serif" fontWeight="800" fontStyle="italic" fontSize="11" fill="#fff" letterSpacing="0.5">VISA</text></svg>);
+const CashLogo = () => (<svg width="34" height="22" viewBox="0 0 34 22"><rect width="34" height="22" rx="3.5" fill="#f4a93a"/><text x="17" y="16" textAnchor="middle" fontFamily="DM Sans, sans-serif" fontWeight="800" fontSize="13" fill="#fff">$</text></svg>);
+const PlusCircle = () => (<svg width="30" height="30" viewBox="0 0 30 30"><circle cx="15" cy="15" r="15" fill="#f0f0f3"/><path d="M15 9v12M9 15h12" stroke="#f5793a" strokeWidth="2.4" strokeLinecap="round"/></svg>);
+const ChatLine = () => (<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#16161a" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M4 5h16a1.5 1.5 0 0 1 1.5 1.5v9A1.5 1.5 0 0 1 20 17H9l-4.5 3.5V17H4a1.5 1.5 0 0 1-1.5-1.5v-9A1.5 1.5 0 0 1 4 5z"/><path d="M8 10.5h8"/></svg>);
+
+window.IconKit = { LocArrow, Dots, Wifi, Battery, Chevron, ChevDown, Back, Headset, Cloche, ReceiptIco, CopyIco, CheckIco, PlusIco, ChatIco, ShareIco, Menu, Scan, Shield, Close, Clock, Book, Wallet, Chat, Gear, Gift, Ticket, Pin, CardLogo, VisaLogo, CashLogo, PlusCircle, ChatLine };
+
+/* =====================  BRAND  ===================== */
+const BRAND = "Pronto";          // rename to your brand
+const USER = "Rutwik Dhongde";   // signed-in user
+const PROFILE = {
+  firstName: "Rutwik",
+  lastName: "Dhongde",
+  mobile: "62****81",
+  email: "d***@gmail.com",
+  emailVerified: false,
+};
+const PAYMENTS = [
+  { id: "cash", type: "cash", label: "Cash" },
+  { id: "v7422", type: "visa", last4: "7422" },
+  { id: "m2341", type: "mastercard", last4: "2341" },
+  { id: "v8538", type: "visa", last4: "8538" },
+];
+window.AppMeta = { BRAND, USER, PROFILE, PAYMENTS };
+
+/* =====================  DATA TABLE  ===================== */
+/* Each object is one row of your "orders" table. Add/edit rows freely. */
+const ORDERS = [
+  {
+    id: "delimart-1",
+    merchant: "Delimart - Guachipelin",
+    kind: "Delivery",
+    status: "Canceled", statusColor: "#e0463a",
+    date: "15/10/2025 2:08 AM", dateShort: "Oct 15, 2025",
+    orderId: "5764644957201697285",
+    tint: "#6a1f9c",
+    items: [
+      { qty: "x1", name: "Combo Familiar de Pollo Frito", price: 3200 },
+      { qty: "x1", name: "Arroz con Camarones", price: 1950 },
+      { qty: "x2", name: "Refresco Natural de Cas", price: 900 },
+      { qty: "x1", name: "Tres Leches Casero", price: 550 },
+    ],
+    deliveryFee: 613, deliveryCoupon: 613, serviceFee: 528, tip: 330,
+    payment: { brand: "mastercard", last4: "2341" },
+  },
+  {
+    id: "wings-burger",
+    merchant: "Wings Burger Bar",
+    kind: "Delivery",
+    status: "Completed", statusColor: "var(--green)",
+    date: "12/10/2025 10:10 PM", dateShort: "Oct 12, 2025",
+    orderId: "5764644957201640012",
+    tint: "#b5471f",
+    items: [
+      { qty: "x1", name: "Combo Alitas BBQ 12 unidades", price: 4200 },
+    ],
+    deliveryFee: 561, deliveryCoupon: 0, serviceFee: 200, tip: 0,
+    payment: { brand: "mastercard", last4: "2341" },
+  },
+  {
+    id: "maxis",
+    merchant: "Maxi's Restaurante By Ricky",
+    kind: "Delivery",
+    status: "Completed", statusColor: "var(--green)",
+    date: "08/10/2025 9:36 PM", dateShort: "Oct 8, 2025",
+    orderId: "5764644957201622876",
+    tint: "#1f6f8b",
+    items: [
+      { qty: "x1", name: "Casado Especial Maxi", price: 4800 },
+      { qty: "x1", name: "Pizza Personal Pepperoni", price: 1700 },
+    ],
+    deliveryFee: 600, deliveryCoupon: 0, serviceFee: 250, tip: 0,
+    payment: { brand: "mastercard", last4: "2341" },
+  },
+  {
+    id: "delimart-2",
+    merchant: "Delimart - Guachipelin",
+    kind: "Delivery",
+    status: "Completed", statusColor: "var(--green)",
+    date: "08/10/2025 12:12 AM", dateShort: "Oct 8, 2025",
+    orderId: "5764644957201699341",
+    tint: "#2f7d4f",
+    items: [
+      { qty: "x1", name: "Pan Artesanal Integral", price: 1200 },
+      { qty: "x1", name: "Jamón de Pavo 250 g", price: 2300 },
+      { qty: "x1", name: "Queso Turrialba", price: 1500 },
+    ],
+    deliveryFee: 500, deliveryCoupon: 0, serviceFee: 440, tip: 0,
+    payment: { brand: "mastercard", last4: "2341" },
+  },
+];
+window.ORDERS = ORDERS;
+
+/* =====================  HELPERS  ===================== */
+const colones = (n) => "₡" + Math.round(n).toLocaleString("en-US");
+function totals(o) {
+  const itemTotal = o.items.reduce((s, it) => s + it.price, 0);
+  const delivery = (o.deliveryFee || 0) - (o.deliveryCoupon || 0);
+  const other = (o.serviceFee || 0) + (o.tip || 0);
+  const total = itemTotal + delivery + other;
+  const saved = (o.deliveryCoupon || 0) + (o.saved || 0);
+  return { itemTotal, delivery, other, total, saved };
+}
+window.OrderUtils = { colones, totals };
+
+function StatusBar({ dark, over }) {
+  if (over) return null;
+  return <div className="statusbar" />;
+}
+function NavHeader({ title, onBack, right }) {
+  return (
+    <div className="navhead">
+      <button className="nav-back" onClick={onBack} aria-label="Back"><Back /></button>
+      <div className="nav-title">{title}</div>
+      <div className="nav-right">{right}</div>
+    </div>
+  );
+}
+window.Chrome = { StatusBar, NavHeader };
+</script>
+
+<script type="text/babel" src="screens.jsx"></script>
+
+<script type="text/babel" data-presets="react">
+(function () {
+const { useState, useRef } = React;
+
+/* =====================  TWEAK DEFAULTS  ===================== */
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  accent: "#ff7a08",
+  transitions: "Slide",
+}/*EDITMODE-END*/;
+
+/* =====================  APP / NAVIGATION  ===================== */
+function App() {
+  const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+  const keyRef = useRef(1);
+  const [stack, setStack] = useState([{ key: 0, screen: "home" }]);
+  const [exiting, setExiting] = useState(null);
+
+  const push = (screen, params = {}) =>
+    setStack((s) => [...s, { key: keyRef.current++, screen, ...params }]);
+  const pop = () =>
+    setStack((s) => {
+      if (s.length <= 1) return s;
+      setExiting(s[s.length - 1]);
+      window.setTimeout(() => setExiting(null), 320);
+      return s.slice(0, -1);
+    });
+  const popToRoot = () =>
+    setStack((s) => {
+      if (s.length <= 1) return s;
+      setExiting(s[s.length - 1]);
+      window.setTimeout(() => setExiting(null), 320);
+      return [s[0]];
+    });
+
+  const render = (item) => {
+    const order = item.orderId ? ORDERS.find((o) => o.id === item.orderId) : null;
+    switch (item.screen) {
+      case "home": return <HomeScreen onGo={(dest) => push(dest)} />;
+      case "trips": return <TripsScreen onOpen={(id) => push("receipt", { orderId: id })} onClose={pop} />;
+      case "receipt": return <ReceiptScreen order={order} onBack={pop}
+        onHelp={() => push("help")}
+        onItemized={() => push("itemized", { orderId: order.id })}
+        onReorder={() => push("reorder", { orderId: order.id })} />;
+      case "itemized": return <ItemizedScreen order={order} onBack={pop} />;
+      case "reorder": return <ReorderScreen order={order} onBack={pop} onDone={popToRoot} />;
+      case "help": return <HelpScreen onBack={pop} onMessages={() => push("messages")} />;
+      case "messages": return <MessageHistory onBack={pop} />;
+      case "profile": return <ProfileScreen onBack={pop} />;
+      case "payment": return <PaymentScreen onBack={pop} />;
+      default: return null;
+    }
+  };
+
+  return (
+    <div className={"phone" + (t.transitions === "Instant" ? " no-anim" : "")}
+         style={{ "--accent": t.accent }}>
+      {stack.map((item, i) => (
+        <div className={"screen" + (i > 0 ? " enter" : "")} key={item.key} style={{ zIndex: i + 1 }}>
+          {render(item)}
+        </div>
+      ))}
+      {exiting && (
+        <div className="screen exit" key={"ex" + exiting.key} style={{ zIndex: 999 }}>
+          {render(exiting)}
+        </div>
+      )}
+
+      <TweaksPanel>
+        <TweakSection label="Theme" />
+        <TweakColor label="Accent" value={t.accent}
+          options={["#ff7a08", "#2a6fdb", "#1f8a5b", "#7a5ae0", "#e0463a"]}
+          onChange={(v) => setTweak("accent", v)} />
+        <TweakSection label="Motion" />
+        <TweakRadio label="Transitions" value={t.transitions}
+          options={["Slide", "Instant"]} onChange={(v) => setTweak("transitions", v)} />
+      </TweaksPanel>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+})();
+</script>
+</body>
+</html>

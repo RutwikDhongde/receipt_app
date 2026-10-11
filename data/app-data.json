@@ -1,0 +1,110 @@
+{
+  "brand": "Pronto",
+  "currency": "₡",
+  "profile": {
+    "firstName": "Rutwik",
+    "lastName": "Dhongde",
+    "mobile": "62****81",
+    "email": "d***@gmail.com",
+    "emailVerified": false,
+    "avatar": null
+  },
+  "payments": [
+    { "id": "cash", "type": "cash", "label": "Cash" },
+    { "id": "v7422", "type": "visa", "last4": "7422" },
+    { "id": "m2341", "type": "mastercard", "last4": "2341" },
+    { "id": "v8538", "type": "visa", "last4": "8538" }
+  ],
+  "orders": [
+    {
+      "id": "delimart-1",
+      "merchant": "Delimart - Guachipelin",
+      "status": "Canceled",
+      "date": "2025-10-15T02:08",
+      "orderId": "5764644957201697285",
+      "items": [
+        { "qty": 1, "name": "Combo Familiar de Pollo Frito", "price": 3200 },
+        { "qty": 1, "name": "Arroz con Camarones", "price": 1950 },
+        { "qty": 2, "name": "Refresco Natural de Cas", "price": 900 },
+        { "qty": 1, "name": "Tres Leches Casero", "price": 550 }
+      ],
+      "deliveryFee": 613,
+      "deliveryCoupon": 613,
+      "serviceFee": 528,
+      "tip": 330,
+      "payment": { "type": "mastercard", "last4": "2341" }
+    },
+    {
+      "id": "wings-burger",
+      "merchant": "Wings Burger Bar",
+      "status": "Completed",
+      "date": "2025-10-12T22:10",
+      "orderId": "5764644957201640012",
+      "items": [
+        { "qty": 1, "name": "Combo Alitas BBQ 12 unidades", "price": 4200 }
+      ],
+      "deliveryFee": 561,
+      "deliveryCoupon": 0,
+      "serviceFee": 200,
+      "tip": 0,
+      "payment": { "type": "mastercard", "last4": "2341" }
+    },
+    {
+      "id": "maxis",
+      "merchant": "Maxi's Restaurante By Ricky",
+      "status": "Completed",
+      "date": "2025-10-08T21:36",
+      "orderId": "5764644957201622876",
+      "items": [
+        { "qty": 1, "name": "Casado Especial Maxi", "price": 4800 },
+        { "qty": 1, "name": "Pizza Personal Pepperoni", "price": 1700 }
+      ],
+      "deliveryFee": 600,
+      "deliveryCoupon": 0,
+      "serviceFee": 250,
+      "tip": 0,
+      "payment": { "type": "mastercard", "last4": "2341" }
+    },
+    {
+      "id": "automercado-big-shop",
+      "merchant": "Auto Mercado - Escazú",
+      "status": "Completed",
+      "date": "2025-10-09T18:45",
+      "orderId": "5764644957201611490",
+      "items": [
+        { "qty": 2, "name": "Leche Dos Pinos 1 L", "price": 1780 },
+        { "qty": 1, "name": "Huevos Grandes x12", "price": 2350 },
+        { "qty": 1, "name": "Café Britt Tradicional 340 g", "price": 4100 },
+        { "qty": 3, "name": "Banano por unidad", "price": 450 },
+        { "qty": 1, "name": "Arroz Tío Pelón 1.8 kg", "price": 2650 },
+        { "qty": 1, "name": "Frijoles Negros Ducal 400 g", "price": 1150 },
+        { "qty": 1, "name": "Aguacate Hass", "price": 990 },
+        { "qty": 2, "name": "Yogurt Griego Natural", "price": 2400 },
+        { "qty": 1, "name": "Salsa Lizano 280 ml", "price": 1290 },
+        { "qty": 1, "name": "Pan Baguette", "price": 1100 }
+      ],
+      "deliveryFee": 1200,
+      "deliveryCoupon": 400,
+      "serviceFee": 690,
+      "tip": 500,
+      "payment": { "type": "visa", "last4": "7422" }
+    },
+    {
+      "id": "delimart-2",
+      "merchant": "Delimart - Guachipelin",
+      "status": "Completed",
+      "date": "2025-10-08T00:12",
+      "orderId": "5764644957201699341",
+      "items": [
+        { "qty": 1, "name": "Pan Artesanal Integral", "price": 1200 },
+        { "qty": 1, "name": "Jamón de Pavo 250 g", "price": 2300 },
+        { "qty": 1, "name": "Queso Turrialba", "price": 1500 }
+      ],
+      "deliveryFee": 500,
+      "deliveryCoupon": 0,
+      "serviceFee": 440,
+      "tip": 0,
+      "payment": { "type": "mastercard", "last4": "2341" }
+    }
+  ]
+}
