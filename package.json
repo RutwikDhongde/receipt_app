@@ -6,7 +6,8 @@
   "description": "Pronto order & receipt flow POC. All data lives in data/app-data.json.",
   "scripts": {
     "build": "node scripts/build.mjs",
-    "check": "node scripts/build.mjs --check"
+    "check": "node scripts/build.mjs --check",
+    "test": "node scripts/build.mjs --check"
   },
   "devDependencies": {
     "esbuild": "0.24.2"
