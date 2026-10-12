@@ -1,5 +1,5 @@
 // Entry point: reads the data embedded by scripts/build.mjs and runs the
-// push/pop screen stack. React and ReactDOM are globals loaded from the CDN.
+// push/pop screen stack. React and ReactDOM come from src/react-globals.js.
 import {
   AppData, HomeScreen, TripsScreen, ReceiptScreen, ItemizedScreen, ReorderScreen,
   HelpScreen, MessageHistory, ProfileScreen, PaymentScreen,

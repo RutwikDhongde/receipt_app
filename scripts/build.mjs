@@ -1,9 +1,11 @@
 // Builds the POC into self-contained HTML pages.
-//   npm run build   -> dist/index.html (open locally) + dist/artifact.html (published page)
+//   npm run build   -> dist/index.html (open locally), dist/artifact.html (published page)
+//                      and mobile/app-html.js (the page the iPhone app shows)
 //   npm run check   -> only validates data/app-data.json
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
+//   --watch         -> rebuilds whenever data/ or src/ changes (used by npm run phone)
+import { readFileSync, writeFileSync, mkdirSync, existsSync, watch } from "node:fs";
 import { dirname, extname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { build } from "esbuild";
 import { validate } from "../src/model.js";
 
@@ -13,75 +15,77 @@ const dist = join(root, "dist");
 
 const MIME = { ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp", ".gif": "image/gif", ".svg": "image/svg+xml" };
 
-function fail(lines) {
-  console.error("\nData problems in data/app-data.json:\n" + lines.map((l) => "  - " + l).join("\n") + "\n");
-  process.exit(1);
+class DataError extends Error {
+  constructor(lines) {
+    super("\nData problems in data/app-data.json:\n" + lines.map((l) => "  - " + l).join("\n") + "\n");
+  }
 }
 
-let data;
-try {
-  data = JSON.parse(readFileSync(join(dataDir, "app-data.json"), "utf8"));
-} catch (e) {
-  fail(["Not valid JSON: " + e.message]);
-}
-const errors = validate(data);
-if (errors.length) fail(errors);
+// Reads, validates and embeds images. Throws DataError on any problem.
+function loadData() {
+  let data;
+  try {
+    data = JSON.parse(readFileSync(join(dataDir, "app-data.json"), "utf8"));
+  } catch (e) {
+    throw new DataError(["Not valid JSON: " + e.message]);
+  }
+  const errors = validate(data);
+  if (errors.length) throw new DataError(errors);
 
-// Image fields may name a file under data/ (e.g. "images/wings.jpg"); it is
-// embedded so the page needs no image hosting.
-const imageErrors = [];
-function embed(value, where) {
-  if (!value || /^data:/.test(value)) return value;
-  const file = join(dataDir, value);
-  const type = MIME[extname(file).toLowerCase()];
-  if (!type) { imageErrors.push(`${where}: "${value}" is not a png, jpg, webp, gif or svg file.`); return null; }
-  if (!existsSync(file)) { imageErrors.push(`${where}: data/${value} does not exist.`); return null; }
-  return `data:${type};base64,${readFileSync(file).toString("base64")}`;
-}
-data.profile.avatar = embed(data.profile.avatar, "profile.avatar");
-data.images = Object.fromEntries(Object.entries(data.images || {}).map(([k, v]) => [k, embed(v, `images.${k}`)]));
-data.orders.forEach((o, i) => { o.banner = embed(o.banner, `orders[${i}].banner`); });
-if (imageErrors.length) fail(imageErrors);
-
-const counts = `${data.orders.length} orders, ${data.payments.length} payment methods`;
-if (process.argv.includes("--check")) {
-  console.log(`Data OK: ${counts}.`);
-  process.exit(0);
+  // Image fields may name a file under data/ (e.g. "images/wings.jpg"); it is
+  // embedded so the page needs no image hosting.
+  const imageErrors = [];
+  function embed(value, where) {
+    if (!value || /^data:/.test(value)) return value;
+    const file = join(dataDir, value);
+    const type = MIME[extname(file).toLowerCase()];
+    if (!type) { imageErrors.push(`${where}: "${value}" is not a png, jpg, webp, gif or svg file.`); return null; }
+    if (!existsSync(file)) { imageErrors.push(`${where}: data/${value} does not exist.`); return null; }
+    return `data:${type};base64,${readFileSync(file).toString("base64")}`;
+  }
+  data.profile.avatar = embed(data.profile.avatar, "profile.avatar");
+  data.images = Object.fromEntries(Object.entries(data.images || {}).map(([k, v]) => [k, embed(v, `images.${k}`)]));
+  data.orders.forEach((o, i) => { o.banner = embed(o.banner, `orders[${i}].banner`); });
+  if (imageErrors.length) throw new DataError(imageErrors);
+  return data;
 }
 
-const out = await build({
-  entryPoints: [join(root, "src/app.jsx")],
-  bundle: true,
-  write: false,
-  minify: true,
-  format: "iife",
-  target: "es2019",
-  jsxFactory: "React.createElement",
-  jsxFragment: "React.Fragment",
-  loader: { ".js": "jsx" },
-});
-const js = out.outputFiles[0].text;
-const css = readFileSync(join(root, "src/styles.css"), "utf8");
-const json = JSON.stringify(data).replace(/</g, "\\u003c");
+const describe = (data) => `${data.orders.length} orders, ${data.payments.length} payment methods`;
 
-const head = `<title>Pronto Receipts</title>
+export async function buildAll() {
+  const data = loadData();
+  const out = await build({
+    entryPoints: [join(root, "src/app.jsx")],
+    bundle: true,
+    write: false,
+    minify: true,
+    format: "iife",
+    target: "es2019",
+    jsxFactory: "React.createElement",
+    jsxFragment: "React.Fragment",
+    loader: { ".js": "jsx" },
+    // React is bundled in (not loaded from a CDN) so the page also works
+    // inside the iPhone app without fetching scripts.
+    inject: [join(root, "src/react-globals.js")],
+    define: { "process.env.NODE_ENV": '"production"' },
+    logLevel: "silent",
+  });
+  const js = out.outputFiles[0].text.replace(/<\/script/gi, "<\\/script");
+  const css = readFileSync(join(root, "src/styles.css"), "utf8");
+  const json = JSON.stringify(data).replace(/</g, "\\u003c");
+
+  const head = `<title>Pronto Receipts</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700;9..40,800&display=swap">
 <style>
 ${css}
 </style>`;
-const body = `<div id="root"></div>
+  const body = `<div id="root"></div>
 <script id="app-data" type="application/json">${json}</script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
 <script>
 ${js}</script>`;
-
-mkdirSync(dist, { recursive: true });
-// The artifact host supplies doctype, <head> and <body> itself.
-writeFileSync(join(dist, "artifact.html"), `${head}\n${body}\n`);
-writeFileSync(join(dist, "index.html"), `<!doctype html>
+  const page = `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -92,5 +96,50 @@ ${head}
 ${body}
 </body>
 </html>
-`);
-console.log(`Built dist/index.html and dist/artifact.html (${counts}).`);
+`;
+
+  mkdirSync(dist, { recursive: true });
+  // The artifact host supplies doctype, <head> and <body> itself.
+  writeFileSync(join(dist, "artifact.html"), `${head}\n${body}\n`);
+  writeFileSync(join(dist, "index.html"), page);
+  // The Expo app imports this module; Metro reloads the phone when it changes.
+  writeFileSync(join(root, "mobile/app-html.js"),
+    "// Generated by scripts/build.mjs from data/ and src/. Do not edit.\nexport default " + JSON.stringify(page) + ";\n");
+  return describe(data);
+}
+
+// Rebuilds on every change under data/ or src/. Bad data is reported and the
+// last good build stays on the phone until the file is fixed.
+export async function watchAll(onBuilt = () => {}) {
+  let timer = null;
+  const run = async () => {
+    try {
+      const counts = await buildAll();
+      console.log(`[${new Date().toLocaleTimeString()}] Rebuilt (${counts}).`);
+      onBuilt();
+    } catch (e) {
+      console.error(e instanceof DataError ? e.message : e);
+    }
+  };
+  await run();
+  // Each folder is watched on its own (not recursively): on Linux a recursive
+  // watch loses a file once an editor saves it by replacing it.
+  for (const dir of [dataDir, join(dataDir, "images"), join(root, "src")]) {
+    if (existsSync(dir)) watch(dir, () => { clearTimeout(timer); timer = setTimeout(run, 150); });
+  }
+}
+
+if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+  try {
+    if (process.argv.includes("--check")) {
+      console.log(`Data OK: ${describe(loadData())}.`);
+    } else if (process.argv.includes("--watch")) {
+      await watchAll();
+    } else {
+      console.log(`Built dist/index.html, dist/artifact.html and mobile/app-html.js (${await buildAll()}).`);
+    }
+  } catch (e) {
+    console.error(e instanceof DataError ? e.message : e);
+    process.exit(1);
+  }
+}

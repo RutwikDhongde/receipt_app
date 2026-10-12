@@ -7,9 +7,12 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "check": "node scripts/build.mjs --check",
-    "test": "node scripts/build.mjs --check"
+    "test": "node scripts/build.mjs --check",
+    "phone": "node scripts/phone.mjs"
   },
   "devDependencies": {
-    "esbuild": "0.24.2"
+    "esbuild": "0.24.2",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
   }
 }

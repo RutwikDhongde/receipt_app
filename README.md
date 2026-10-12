@@ -19,6 +19,7 @@ then rebuild:
 npm install      # once
 npm run check    # checks the data and lists any problems
 npm run build    # writes dist/index.html (open it in a browser) and dist/artifact.html
+                 # (or use npm run phone to see it on your iPhone, see below)
 ```
 
 ### An order (the comments are explanations; leave them out of the real file)
@@ -52,6 +53,30 @@ Put files in `data/images/` and reference them by path. They are embedded into
 the built page. Supported fields: `profile.avatar`, each order's `banner`, and
 `images.homeHero`. Without images the app uses drawn placeholders.
 
+## Run it on your iPhone (Expo Go)
+The `mobile/` folder is a small Expo app that shows the page full-screen, so you
+can try it on a real iPhone and watch it update while you edit the data.
+
+**Once:** install [Node.js](https://nodejs.org) (LTS) and Git on your computer,
+**Expo Go** from the App Store on your iPhone, and download this repository
+(`git clone`, or *Code → Download ZIP* on GitHub). Keep the phone and the
+computer on the same Wi-Fi.
+
+**Each time:** in a terminal, inside the repository folder:
+```sh
+npm install      # the first time, and after pulling new code
+npm run phone    # the first run also installs the iPhone app's packages
+```
+1. A QR code appears in the terminal. Scan it with the iPhone **Camera** app
+   and tap the banner; the app opens in Expo Go.
+2. Edit `data/app-data.json` and save. The phone reloads within a few seconds.
+   If the file has a mistake, the terminal says what is wrong and the phone
+   keeps the last good version until you fix it.
+3. Press **Ctrl+C** in the terminal to stop.
+
+If Expo Go says it cannot connect (some office or public Wi-Fi blocks it), stop
+it and run `npm run phone -- --tunnel` instead.
+
 ## Layout
 | Path | What it is |
 |---|---|
@@ -60,5 +85,7 @@ the built page. Supported fields: `profile.avatar`, each order's `banner`, and
 | `src/screens.jsx` | The screens |
 | `src/app.jsx` | Navigation stack and startup |
 | `src/styles.css` | Design tokens and styles from the handoff |
-| `scripts/build.mjs` | Validates data, embeds images, bundles to `dist/` |
+| `scripts/build.mjs` | Validates data, embeds images, bundles to `dist/` and `mobile/app-html.js` |
+| `scripts/phone.mjs` | `npm run phone`: rebuilds on every change and starts Expo |
+| `mobile/` | The Expo (iPhone) app that shows the built page |
 | `docs/design/` | The original design handoff (open `Receipt.html`) |
